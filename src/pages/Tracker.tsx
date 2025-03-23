@@ -1,0 +1,287 @@
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { MapPin, Clock, AlertTriangle, Map, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/components/ui/use-toast";
+import { WebSocketService } from "@/utils/websocket";
+import { getCurrentPosition, formatLocation, getFormattedDate } from "@/utils/locationUtils";
+
+const Tracker = () => {
+  const { trackerId } = useParams<{ trackerId: string }>();
+  const { toast } = useToast();
+  const [isConnected, setIsConnected] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [wsService, setWsService] = useState<WebSocketService | null>(null);
+
+  // Handle WebSocket connection
+  useEffect(() => {
+    if (!trackerId) {
+      setError("Invalid tracker ID");
+      return;
+    }
+
+    const ws = new WebSocketService(trackerId);
+    setWsService(ws);
+
+    const connectWebSocket = async () => {
+      try {
+        await ws.connect();
+        setIsConnected(true);
+        
+        toast({
+          title: "Connected",
+          description: "Successfully connected to tracking server.",
+        });
+      } catch (error) {
+        console.error("WebSocket connection error:", error);
+        setError("Failed to connect to tracking server. Please try again.");
+        
+        toast({
+          title: "Connection Failed",
+          description: "Could not connect to tracking server. Check your network.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    connectWebSocket();
+
+    // Clean up
+    return () => {
+      if (ws) {
+        ws.disconnect();
+      }
+    };
+  }, [trackerId, toast]);
+
+  // Start tracking function
+  const startTracking = useCallback(async () => {
+    if (!wsService || !trackerId) return;
+
+    setIsTracking(true);
+    
+    const trackLocation = async () => {
+      try {
+        setProgress(25);
+        const position = await getCurrentPosition();
+        setProgress(75);
+        
+        const locationData = formatLocation(position, trackerId);
+        
+        // Send to WebSocket server
+        wsService.sendLocation(locationData);
+        
+        // Update UI
+        setCoordinates({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setAccuracy(position.coords.accuracy);
+        setLastUpdate(getFormattedDate(position.timestamp));
+        setProgress(100);
+        
+        // Reset progress after a second
+        setTimeout(() => setProgress(0), 1000);
+      } catch (error) {
+        console.error("Error getting location:", error);
+        setError("Could not access location. Please ensure location services are enabled.");
+        setIsTracking(false);
+        
+        toast({
+          title: "Location Error",
+          description: "Could not access your location. Please check your device settings.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    // Track immediately
+    await trackLocation();
+    
+    // Continue tracking every minute
+    const intervalId = setInterval(trackLocation, 60000);
+    
+    // Clear interval when component unmounts or tracking stops
+    return () => {
+      clearInterval(intervalId);
+      setIsTracking(false);
+    };
+  }, [wsService, trackerId, toast]);
+
+  // Start tracking automatically
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    
+    if (isConnected && !error) {
+      cleanup = startTracking();
+    }
+    
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [isConnected, error, startTracking]);
+
+  return (
+    <div className="max-w-md mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="mb-8"
+      >
+        <Link 
+          to="/" 
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to home
+        </Link>
+        
+        <h1 className="text-2xl font-bold">Location Tracker</h1>
+        <p className="text-muted-foreground">
+          Tracker ID: <span className="font-mono">{trackerId}</span>
+        </p>
+      </motion.div>
+      
+      {error ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="border-destructive/50">
+            <CardHeader className="bg-destructive/10 border-b border-destructive/20">
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Error
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <p className="mb-4">{error}</p>
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.reload()}
+                className="w-full"
+              >
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="shadow-md border-border/50">
+            <CardHeader className="border-b border-border/50">
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="relative h-6 w-6">
+                    <MapPin className="h-6 w-6 text-geo-blue" />
+                    {isTracking && (
+                      <span className="absolute top-0 right-0 h-2 w-2 bg-green-500 rounded-full" />
+                    )}
+                  </div>
+                  Location Tracker
+                </div>
+                
+                <div className="text-xs font-normal text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  Updates every minute
+                </div>
+              </CardTitle>
+            </CardHeader>
+            
+            <CardContent className="pt-6 space-y-6">
+              {progress > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">Updating location...</div>
+                  <Progress value={progress} className="h-1.5" />
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <StatusItem 
+                  label="Status"
+                  value={isTracking ? "Active" : "Connecting..."}
+                  isActive={isTracking}
+                />
+                
+                <StatusItem 
+                  label="Last Update"
+                  value={lastUpdate || "Waiting..."}
+                  isActive={!!lastUpdate}
+                />
+                
+                {coordinates && (
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Coordinates</div>
+                    <div className="font-mono text-sm bg-muted p-2 rounded">
+                      {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+                    </div>
+                  </div>
+                )}
+                
+                {accuracy !== null && (
+                  <StatusItem 
+                    label="Accuracy"
+                    value={`±${accuracy.toFixed(1)} meters`}
+                    isActive={true}
+                  />
+                )}
+              </div>
+              
+              <div className="pt-2">
+                <p className="text-sm text-muted-foreground mb-4">
+                  This page is now sending location updates to the tracking server.
+                  You can close this page to stop tracking.
+                </p>
+                
+                <Button 
+                  asChild
+                  variant="outline" 
+                  className="w-full group"
+                >
+                  <Link to={`/map/${trackerId}`}>
+                    <Map className="h-4 w-4 mr-2 group-hover:text-geo-blue transition-colors" />
+                    View on Map
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+interface StatusItemProps {
+  label: string;
+  value: string;
+  isActive: boolean;
+}
+
+const StatusItem = ({ label, value, isActive }: StatusItemProps) => {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-1.5">
+        <div className={`h-2 w-2 rounded-full ${isActive ? "bg-green-500" : "bg-gray-300"}`} />
+        <span className="text-sm font-medium">{value}</span>
+      </div>
+    </div>
+  );
+};
+
+export default Tracker;
