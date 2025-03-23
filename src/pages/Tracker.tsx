@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -22,7 +21,6 @@ const Tracker = () => {
   const [progress, setProgress] = useState(0);
   const [wsService, setWsService] = useState<WebSocketService | null>(null);
 
-  // Handle WebSocket connection
   useEffect(() => {
     if (!trackerId) {
       setError("Invalid tracker ID");
@@ -55,7 +53,6 @@ const Tracker = () => {
 
     connectWebSocket();
 
-    // Clean up
     return () => {
       if (ws) {
         ws.disconnect();
@@ -63,9 +60,8 @@ const Tracker = () => {
     };
   }, [trackerId, toast]);
 
-  // Start tracking function
-  const startTracking = useCallback(async () => {
-    if (!wsService || !trackerId) return;
+  const startTracking = useCallback(() => {
+    if (!wsService || !trackerId) return () => {};
 
     setIsTracking(true);
     
@@ -77,10 +73,8 @@ const Tracker = () => {
         
         const locationData = formatLocation(position, trackerId);
         
-        // Send to WebSocket server
         wsService.sendLocation(locationData);
         
-        // Update UI
         setCoordinates({
           lat: position.coords.latitude,
           lng: position.coords.longitude
@@ -89,7 +83,6 @@ const Tracker = () => {
         setLastUpdate(getFormattedDate(position.timestamp));
         setProgress(100);
         
-        // Reset progress after a second
         setTimeout(() => setProgress(0), 1000);
       } catch (error) {
         console.error("Error getting location:", error);
@@ -104,30 +97,24 @@ const Tracker = () => {
       }
     };
 
-    // Track immediately
-    await trackLocation();
+    trackLocation();
     
-    // Continue tracking every minute
     const intervalId = setInterval(trackLocation, 60000);
     
-    // Clear interval when component unmounts or tracking stops
     return () => {
       clearInterval(intervalId);
       setIsTracking(false);
     };
   }, [wsService, trackerId, toast]);
 
-  // Start tracking automatically
   useEffect(() => {
-    let cleanup: (() => void) | undefined;
+    let cleanup = () => {};
     
     if (isConnected && !error) {
       cleanup = startTracking();
     }
     
-    return () => {
-      if (cleanup) cleanup();
-    };
+    return cleanup;
   }, [isConnected, error, startTracking]);
 
   return (
