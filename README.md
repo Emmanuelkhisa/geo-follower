@@ -26,6 +26,11 @@ npm i
 npm run dev
 ```
 
+## How To Use
+ - Create a tracking link
+ - Share this link with a target device
+ - View on map or record all the data using node terminal(instructions in web)
+ - Avoid cross origin location tracing.
 
 ## What technologies are used for this project?
 
