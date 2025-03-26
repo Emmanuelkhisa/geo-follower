@@ -11,8 +11,7 @@ self.addEventListener('activate', (event) => {
 });
 
 // Store tracking data
-let trackerId = null;
-let trackingInterval = null;
+let activeTrackers = new Map(); // Map of trackerId -> interval ID
 let wsConnection = null;
 
 // Handle messages from the main app
@@ -24,7 +23,7 @@ self.addEventListener('message', (event) => {
       startTracking(data.trackerId, data.interval || 60000);
       break;
     case 'STOP_TRACKING':
-      stopTracking();
+      stopTracking(data.trackerId);
       break;
     default:
       console.log('Unknown message type:', type);
@@ -32,61 +31,75 @@ self.addEventListener('message', (event) => {
 });
 
 function startTracking(id, interval) {
-  if (trackingInterval) {
-    clearInterval(trackingInterval);
+  // If already tracking this ID, clear the previous interval
+  if (activeTrackers.has(id)) {
+    clearInterval(activeTrackers.get(id));
   }
   
-  trackerId = id;
-  console.log(`Starting background tracking for ID: ${trackerId}`);
+  console.log(`Starting background tracking for ID: ${id}`);
   
-  // Initialize WebSocket connection
-  if (self.WebSocket) {
+  // Initialize WebSocket connection if not already connected
+  if (!wsConnection && self.WebSocket) {
     connectWebSocket();
-  } else {
-    console.error('WebSocket not supported in this service worker');
   }
   
   // Start tracking at specified interval
   getCurrentPosition()
-    .then(position => sendLocationUpdate(position))
+    .then(position => sendLocationUpdate(position, id))
     .catch(error => console.error('Initial position error:', error));
   
-  trackingInterval = setInterval(() => {
+  const intervalId = setInterval(() => {
     getCurrentPosition()
-      .then(position => sendLocationUpdate(position))
+      .then(position => sendLocationUpdate(position, id))
       .catch(error => console.error('Position error:', error));
   }, interval);
+  
+  // Store the interval ID for this tracker
+  activeTrackers.set(id, intervalId);
   
   // Notify clients that tracking has started
   self.clients.matchAll().then(clients => {
     clients.forEach(client => {
       client.postMessage({
         type: 'TRACKING_STARTED',
-        trackerId: trackerId
+        trackerId: id
       });
     });
   });
 }
 
-function stopTracking() {
-  console.log('Stopping background tracking');
-  if (trackingInterval) {
-    clearInterval(trackingInterval);
-    trackingInterval = null;
+function stopTracking(trackerId) {
+  if (!trackerId) {
+    // Stop all trackers if no specific trackerId provided
+    console.log('Stopping all background tracking');
+    activeTrackers.forEach((intervalId, id) => {
+      clearInterval(intervalId);
+    });
+    activeTrackers.clear();
+    
+    if (wsConnection) {
+      wsConnection.close();
+      wsConnection = null;
+    }
+  } else if (activeTrackers.has(trackerId)) {
+    // Stop only the specified tracker
+    console.log(`Stopping background tracking for ID: ${trackerId}`);
+    clearInterval(activeTrackers.get(trackerId));
+    activeTrackers.delete(trackerId);
   }
   
-  if (wsConnection) {
+  // If no more active trackers, close WebSocket
+  if (activeTrackers.size === 0 && wsConnection) {
     wsConnection.close();
     wsConnection = null;
   }
-  
-  trackerId = null;
   
   // Notify clients that tracking has stopped
   self.clients.matchAll().then(clients => {
     clients.forEach(client => {
       client.postMessage({
-        type: 'TRACKING_STOPPED'
+        type: 'TRACKING_STOPPED',
+        trackerId: trackerId
       });
     });
   });
@@ -111,7 +124,7 @@ function getCurrentPosition() {
   });
 }
 
-function sendLocationUpdate(position) {
+function sendLocationUpdate(position, trackerId) {
   if (!trackerId) return;
   
   const locationData = {
@@ -142,6 +155,15 @@ function sendLocationUpdate(position) {
       });
     });
   });
+  
+  // Store the latest location in IndexedDB or another persistent storage
+  // This is a simulation, in a real app you would use IndexedDB
+  try {
+    self.lastLocations = self.lastLocations || {};
+    self.lastLocations[trackerId] = locationData;
+  } catch (error) {
+    console.error('Error storing location:', error);
+  }
 }
 
 function connectWebSocket() {
@@ -154,16 +176,23 @@ function connectWebSocket() {
     wsConnection.onopen = () => {
       console.log('Worker WebSocket connection established');
       
-      // Register trackerId with server
-      wsConnection.send(JSON.stringify({
-        type: 'register',
-        trackerId: trackerId
-      }));
+      // Register all active trackers with server
+      activeTrackers.forEach((_, trackerId) => {
+        wsConnection.send(JSON.stringify({
+          type: 'register',
+          trackerId: trackerId
+        }));
+      });
     };
     
     wsConnection.onclose = () => {
       console.log('Worker WebSocket connection closed');
-      setTimeout(connectWebSocket, 3000); // Try to reconnect
+      setTimeout(() => {
+        // Only reconnect if we have active trackers
+        if (activeTrackers.size > 0) {
+          connectWebSocket();
+        }
+      }, 3000); // Try to reconnect
     };
     
     wsConnection.onerror = (error) => {

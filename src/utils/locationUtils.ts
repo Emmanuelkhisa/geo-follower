@@ -12,6 +12,7 @@ export interface SavedTracker {
   name: string;
   lastSeen?: number;
   notes?: string;
+  isTracking?: boolean;
 }
 
 export const getCurrentPosition = (): Promise<GeolocationPosition> => {
@@ -91,7 +92,12 @@ export const saveTracker = (tracker: SavedTracker): void => {
     const existingIndex = trackers.findIndex(t => t.id === tracker.id);
     
     if (existingIndex >= 0) {
-      trackers[existingIndex] = tracker;
+      // Update existing tracker but preserve isTracking state
+      const isCurrentlyTracking = trackers[existingIndex].isTracking;
+      trackers[existingIndex] = {
+        ...tracker,
+        isTracking: isCurrentlyTracking || tracker.isTracking
+      };
     } else {
       trackers.push(tracker);
     }
@@ -102,11 +108,42 @@ export const saveTracker = (tracker: SavedTracker): void => {
   }
 };
 
+export const updateTrackerStatus = (trackerId: string, isTracking: boolean): void => {
+  try {
+    const trackers = getSavedTrackers();
+    const existingIndex = trackers.findIndex(t => t.id === trackerId);
+    
+    if (existingIndex >= 0) {
+      trackers[existingIndex].isTracking = isTracking;
+      localStorage.setItem('savedTrackers', JSON.stringify(trackers));
+    }
+  } catch (error) {
+    console.error('Error updating tracker status:', error);
+  }
+};
+
+export const updateTrackerLastSeen = (trackerId: string, timestamp: number): void => {
+  try {
+    const trackers = getSavedTrackers();
+    const existingIndex = trackers.findIndex(t => t.id === trackerId);
+    
+    if (existingIndex >= 0) {
+      trackers[existingIndex].lastSeen = timestamp;
+      localStorage.setItem('savedTrackers', JSON.stringify(trackers));
+    }
+  } catch (error) {
+    console.error('Error updating tracker last seen:', error);
+  }
+};
+
 export const deleteTracker = (trackerId: string): void => {
   try {
     const trackers = getSavedTrackers();
     const filteredTrackers = trackers.filter(t => t.id !== trackerId);
     localStorage.setItem('savedTrackers', JSON.stringify(filteredTrackers));
+    
+    // Also stop tracking for this tracker if it's active
+    stopBackgroundTracking(trackerId);
   } catch (error) {
     console.error('Error deleting tracker:', error);
   }
@@ -127,21 +164,80 @@ export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration
   return null;
 };
 
+export const getActiveTrackers = (): string[] => {
+  try {
+    const trackers = getSavedTrackers();
+    return trackers
+      .filter(tracker => tracker.isTracking)
+      .map(tracker => tracker.id);
+  } catch (error) {
+    console.error('Error getting active trackers:', error);
+    return [];
+  }
+};
+
 export const startBackgroundTracking = (trackerId: string, interval = 60000): void => {
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'START_TRACKING',
       data: { trackerId, interval }
     });
+    
+    // Update the tracker's status in localStorage
+    updateTrackerStatus(trackerId, true);
   } else {
     console.warn('ServiceWorker is not active yet, cannot start background tracking');
+    // Try to register and then start tracking
+    registerServiceWorker().then(() => {
+      setTimeout(() => {
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'START_TRACKING',
+            data: { trackerId, interval }
+          });
+          updateTrackerStatus(trackerId, true);
+        }
+      }, 1000);
+    });
   }
 };
 
-export const stopBackgroundTracking = (): void => {
+export const stopBackgroundTracking = (trackerId?: string): void => {
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
-      type: 'STOP_TRACKING'
+      type: 'STOP_TRACKING',
+      data: { trackerId }
+    });
+    
+    // If trackerId is provided, only update that tracker
+    if (trackerId) {
+      updateTrackerStatus(trackerId, false);
+    } else {
+      // Update all trackers to not tracking
+      const trackers = getSavedTrackers();
+      trackers.forEach(tracker => {
+        tracker.isTracking = false;
+      });
+      localStorage.setItem('savedTrackers', JSON.stringify(trackers));
+    }
+  }
+};
+
+// Function to restore active trackers after page reload
+export const restoreActiveTrackers = (): void => {
+  const activeTrackers = getActiveTrackers();
+  
+  if (activeTrackers.length > 0 && 'serviceWorker' in navigator) {
+    console.log('Restoring active trackers:', activeTrackers);
+    
+    // Register service worker first if needed
+    registerServiceWorker().then(() => {
+      // Start tracking for each active tracker
+      activeTrackers.forEach(trackerId => {
+        setTimeout(() => {
+          startBackgroundTracking(trackerId);
+        }, 1000);
+      });
     });
   }
 };
