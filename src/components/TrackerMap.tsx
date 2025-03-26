@@ -1,11 +1,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { LocationData } from '@/utils/locationUtils';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
 
-// Set default token to the provided public token
+// Set default token to your public token
 const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
 
 const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => {
@@ -17,6 +17,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
   const [mapboxToken, setMapboxToken] = useState<string>(localStorage.getItem('mapbox_token') || DEFAULT_MAPBOX_TOKEN);
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [mapboxgl, setMapboxgl] = useState<any>(null);
 
   // Dynamically import mapbox-gl
   useEffect(() => {
@@ -24,8 +25,19 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
     
     const loadMapbox = async () => {
       try {
-        const mapboxModule = await import('mapbox-gl');
+        // Try to load Mapbox GL JS
+        const mapboxModule = await import('mapbox-gl').catch(error => {
+          console.error('Failed to import mapbox-gl:', error);
+          setMapError('Failed to load map library. Please check your internet connection and try again.');
+          return null;
+        });
+        
+        if (!mapboxModule) return;
+        
         const mapboxgl = mapboxModule.default;
+        setMapboxgl(mapboxgl);
+        
+        // Set access token
         mapboxgl.accessToken = mapboxToken;
         setMapboxLoaded(true);
         
@@ -40,7 +52,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
             pitch: 45,
             attributionControl: false,
             antialias: true,
-            failIfMajorPerformanceCaveat: false // Add this to improve compatibility
+            failIfMajorPerformanceCaveat: true
           });
 
           map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -63,6 +75,8 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
             if (e.error && e.error.status === 401) {
               setMapError('Invalid Mapbox token. Please provide a valid token.');
               setShowTokenInput(true);
+            } else if (e.error && (e.error.status === 404 || e.error.status === 400)) {
+              setMapError('Unable to load map style. Please check your internet connection or try a different browser.');
             } else {
               setMapError('Error loading map. Please try with a different browser or device.');
             }
@@ -71,11 +85,11 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
           console.error('Error initializing map:', error);
           toast({
             title: 'Error',
-            description: 'Failed to initialize map. Please check your Mapbox token.',
+            description: 'Failed to initialize map. Please check your browser compatibility or try a different browser.',
             variant: 'destructive',
           });
           setShowTokenInput(true);
-          setMapError('Failed to initialize map');
+          setMapError('Failed to initialize map. Your browser may not support WebGL.');
         }
       } catch (error) {
         console.error('Error loading Mapbox GL:', error);
@@ -84,7 +98,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
           description: 'Failed to load map library',
           variant: 'destructive',
         });
-        setMapError('Failed to load map library');
+        setMapError('Failed to load map library. Please check your internet connection and try again.');
       }
     };
 
@@ -99,11 +113,9 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
 
   // Update marker when location data changes
   useEffect(() => {
-    if (!mapLoaded || !locationData || !map.current) return;
+    if (!mapLoaded || !locationData || !map.current || !mapboxgl) return;
 
     try {
-      const mapboxgl = window.mapboxgl;
-      
       const el = document.createElement('div');
       el.className = 'relative w-5 h-5';
       
@@ -147,51 +159,49 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
             accuracy: locationData.accuracy
           }
         });
-      } else {
-        if (map.current.loaded()) {
-          try {
-            map.current.addSource(accuracyCircleId, {
-              type: 'geojson',
-              data: {
-                type: 'Feature',
-                geometry: {
-                  type: 'Point',
-                  coordinates: [locationData.longitude, locationData.latitude]
-                },
-                properties: {
-                  accuracy: locationData.accuracy
-                }
+      } else if (map.current.loaded()) {
+        try {
+          map.current.addSource(accuracyCircleId, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [locationData.longitude, locationData.latitude]
+              },
+              properties: {
+                accuracy: locationData.accuracy
               }
-            });
+            }
+          });
 
-            map.current.addLayer({
-              id: accuracyCircleId,
-              type: 'circle',
-              source: accuracyCircleId,
-              paint: {
-                'circle-radius': {
-                  stops: [
-                    [0, 0],
-                    [20, locationData.accuracy / 2]
-                  ],
-                  base: 2
-                },
-                'circle-color': '#3B82F6',
-                'circle-opacity': 0.15,
-                'circle-stroke-width': 1,
-                'circle-stroke-color': '#3B82F6',
-                'circle-stroke-opacity': 0.3
-              }
-            });
-          } catch (e) {
-            console.warn('Could not add accuracy circle', e);
-          }
+          map.current.addLayer({
+            id: accuracyCircleId,
+            type: 'circle',
+            source: accuracyCircleId,
+            paint: {
+              'circle-radius': {
+                stops: [
+                  [0, 0],
+                  [20, locationData.accuracy / 2]
+                ],
+                base: 2
+              },
+              'circle-color': '#3B82F6',
+              'circle-opacity': 0.15,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#3B82F6',
+              'circle-stroke-opacity': 0.3
+            }
+          });
+        } catch (e) {
+          console.warn('Could not add accuracy circle', e);
         }
       }
     } catch (error) {
       console.error('Error updating marker:', error);
     }
-  }, [mapLoaded, locationData]);
+  }, [mapLoaded, locationData, mapboxgl]);
 
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +284,10 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
           {mapError && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80 backdrop-blur-sm">
               <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full">
-                <h3 className="text-lg font-medium mb-4 text-red-600">Map Error</h3>
+                <h3 className="text-lg font-medium mb-4 text-red-600 flex items-center">
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  Map Error
+                </h3>
                 <p className="mb-4">{mapError}</p>
                 <div className="flex space-x-2">
                   <Button 

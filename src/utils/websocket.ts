@@ -1,3 +1,4 @@
+
 import { LocationData } from './locationUtils';
 
 // For development and preview, we'll simulate the WebSocket service
@@ -146,6 +147,7 @@ export class MapWebSocketService {
           const randomLng = baseLongitude + (Math.random() * 0.01) - 0.005;
           
           const simulatedData: LocationData = {
+            id: this.trackerId, // Add the required id property
             latitude: randomLat,
             longitude: randomLng,
             accuracy: 10 + Math.random() * 20,
