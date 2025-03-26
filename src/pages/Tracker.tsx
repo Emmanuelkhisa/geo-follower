@@ -1,31 +1,87 @@
-import { useEffect, useState, useCallback } from "react";
+
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MapPin, Clock, AlertTriangle, Map, ArrowLeft } from "lucide-react";
+import { MapPin, Clock, AlertTriangle, Map, ArrowLeft, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
-import { WebSocketService } from "@/utils/websocket";
-import { getCurrentPosition, formatLocation, getFormattedDate } from "@/utils/locationUtils";
+import { 
+  WebSocketService 
+} from "@/utils/websocket";
+import { 
+  getCurrentPosition, 
+  formatLocation, 
+  getFormattedDate,
+  registerServiceWorker,
+  startBackgroundTracking,
+  stopBackgroundTracking,
+  SavedTracker,
+  getSavedTrackers
+} from "@/utils/locationUtils";
+import TrackerManagement from "@/components/TrackerManagement";
 
 const Tracker = () => {
   const { trackerId } = useParams<{ trackerId: string }>();
   const { toast } = useToast();
   const [isConnected, setIsConnected] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
+  const [isBackgroundTracking, setIsBackgroundTracking] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [wsService, setWsService] = useState<WebSocketService | null>(null);
+  const [savedTrackerInfo, setSavedTrackerInfo] = useState<SavedTracker | null>(null);
+  const serviceWorkerRegistered = useRef(false);
 
   useEffect(() => {
     if (!trackerId) {
       setError("Invalid tracker ID");
       return;
     }
+
+    // Check if this tracker is saved
+    const savedTrackers = getSavedTrackers();
+    const saved = savedTrackers.find(t => t.id === trackerId);
+    if (saved) {
+      setSavedTrackerInfo(saved);
+    }
+
+    // Setup service worker for background tracking
+    const setupServiceWorker = async () => {
+      const registration = await registerServiceWorker();
+      if (registration) {
+        serviceWorkerRegistered.current = true;
+        
+        // Listen for messages from service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          const { type, data } = event.data;
+          
+          if (type === 'LOCATION_UPDATE' && data) {
+            // Update UI with location from service worker
+            setCoordinates({
+              lat: data.latitude,
+              lng: data.longitude
+            });
+            setAccuracy(data.accuracy);
+            setLastUpdate(getFormattedDate(data.timestamp));
+          } else if (type === 'TRACKING_STARTED') {
+            setIsBackgroundTracking(true);
+            toast({
+              title: "Background tracking active",
+              description: "Location will be tracked even when browser is closed",
+            });
+          } else if (type === 'TRACKING_STOPPED') {
+            setIsBackgroundTracking(false);
+          }
+        });
+      }
+    };
+
+    setupServiceWorker();
 
     const ws = new WebSocketService(trackerId);
     setWsService(ws);
@@ -56,6 +112,13 @@ const Tracker = () => {
     return () => {
       if (ws) {
         ws.disconnect();
+      }
+      
+      if (isBackgroundTracking) {
+        // Don't stop background tracking when leaving page
+        console.log("Keeping background tracking active after page close");
+      } else {
+        stopBackgroundTracking();
       }
     };
   }, [trackerId, toast]);
@@ -117,6 +180,24 @@ const Tracker = () => {
     return cleanup;
   }, [isConnected, error, startTracking]);
 
+  const toggleBackgroundTracking = () => {
+    if (isBackgroundTracking) {
+      stopBackgroundTracking();
+      setIsBackgroundTracking(false);
+      toast({
+        title: "Background tracking stopped",
+        description: "Location will only be tracked while this page is open",
+      });
+    } else if (trackerId) {
+      startBackgroundTracking(trackerId);
+      setIsBackgroundTracking(true);
+      toast({
+        title: "Background tracking started",
+        description: "Location will be tracked even when browser is closed",
+      });
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto">
       <motion.div
@@ -134,7 +215,13 @@ const Tracker = () => {
         
         <h1 className="text-2xl font-bold">Location Tracker</h1>
         <p className="text-muted-foreground">
-          Tracker ID: <span className="font-mono">{trackerId}</span>
+          {savedTrackerInfo ? (
+            <>
+              <span className="font-medium">{savedTrackerInfo.name}</span> <span className="font-mono text-xs">({trackerId})</span>
+            </>
+          ) : (
+            <>Tracker ID: <span className="font-mono">{trackerId}</span></>
+          )}
         </p>
       </motion.div>
       
@@ -169,7 +256,7 @@ const Tracker = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <Card className="shadow-md border-border/50">
+          <Card className="shadow-md border-border/50 mb-6">
             <CardHeader className="border-b border-border/50">
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -226,12 +313,29 @@ const Tracker = () => {
                     isActive={true}
                   />
                 )}
+                
+                <StatusItem 
+                  label="Background Tracking"
+                  value={isBackgroundTracking ? "Enabled" : "Disabled"}
+                  isActive={isBackgroundTracking}
+                />
               </div>
               
               <div className="pt-2">
+                <Button 
+                  variant={isBackgroundTracking ? "destructive" : "default"}
+                  className="w-full flex items-center justify-center gap-2 mb-4"
+                  onClick={toggleBackgroundTracking}
+                >
+                  <Zap className="h-4 w-4" />
+                  {isBackgroundTracking ? "Stop Background Tracking" : "Enable Background Tracking"}
+                </Button>
+                
                 <p className="text-sm text-muted-foreground mb-4">
-                  This page is now sending location updates to the tracking server.
-                  You can close this page to stop tracking.
+                  {isBackgroundTracking 
+                    ? "Background tracking enabled. Location updates will continue even when browser is closed."
+                    : "This page is now sending location updates. You can enable background tracking to continue after closing."
+                  }
                 </p>
                 
                 <Button 
@@ -247,6 +351,14 @@ const Tracker = () => {
               </div>
             </CardContent>
           </Card>
+          
+          <TrackerManagement 
+            currentTrackerId={trackerId} 
+          />
+
+          <div className="text-center text-xs text-muted-foreground mt-12">
+            <p>Geo-Follower - Developed by Emmanuel Khisa</p>
+          </div>
         </motion.div>
       )}
     </div>

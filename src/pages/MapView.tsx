@@ -1,26 +1,41 @@
 
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, MapPin, Clock, LocateFixed } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, MapPin, Clock, LocateFixed, Bookmark } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { MapWebSocketService } from "@/utils/websocket";
-import { LocationData, getFormattedDate } from "@/utils/locationUtils";
+import { 
+  LocationData, 
+  getFormattedDate, 
+  getSavedTrackers
+} from "@/utils/locationUtils";
 import TrackerMap from "@/components/TrackerMap";
+import TrackerManagement from "@/components/TrackerManagement";
 
 const MapView = () => {
   const { trackerId } = useParams<{ trackerId: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isConnected, setIsConnected] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showManagement, setShowManagement] = useState(false);
+  const [trackerName, setTrackerName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!trackerId) {
       setError("Invalid tracker ID");
       return;
+    }
+
+    // Check if this tracker is saved
+    const savedTrackers = getSavedTrackers();
+    const saved = savedTrackers.find(t => t.id === trackerId);
+    if (saved) {
+      setTrackerName(saved.name);
     }
 
     // Handle incoming location updates
@@ -65,6 +80,12 @@ const MapView = () => {
     };
   }, [trackerId, toast]);
 
+  const handleSelectTracker = (selectedTrackerId: string) => {
+    if (selectedTrackerId !== trackerId) {
+      navigate(`/map/${selectedTrackerId}`);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="mb-6">
@@ -80,7 +101,13 @@ const MapView = () => {
           Location Tracker Map
         </h1>
         <p className="text-muted-foreground">
-          Tracker ID: <span className="font-mono">{trackerId}</span>
+          {trackerName ? (
+            <>
+              <span className="font-medium">{trackerName}</span> <span className="font-mono text-xs">({trackerId})</span>
+            </>
+          ) : (
+            <>Tracker ID: <span className="font-mono">{trackerId}</span></>
+          )}
         </p>
       </div>
       
@@ -143,7 +170,7 @@ const MapView = () => {
           </motion.div>
         </div>
         
-        <div>
+        <div className="space-y-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -222,6 +249,15 @@ const MapView = () => {
                       </Button>
                       
                       <Button 
+                        variant="outline"
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={() => setShowManagement(!showManagement)}
+                      >
+                        <Bookmark className="h-4 w-4" />
+                        {showManagement ? "Hide Saved Trackers" : "Manage Saved Trackers"}
+                      </Button>
+                      
+                      <Button 
                         asChild
                         variant="ghost"
                         className="w-full"
@@ -236,6 +272,23 @@ const MapView = () => {
               </CardContent>
             </Card>
           </motion.div>
+          
+          {showManagement && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <TrackerManagement 
+                currentTrackerId={trackerId} 
+                onSelectTracker={handleSelectTracker}
+              />
+            </motion.div>
+          )}
+          
+          <div className="text-center text-xs text-muted-foreground mt-4">
+            <p>Geo-Follower - Developed by Emmanuel Khisa</p>
+          </div>
         </div>
       </div>
     </div>

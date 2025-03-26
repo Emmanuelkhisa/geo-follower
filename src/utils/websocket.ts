@@ -70,6 +70,15 @@ export class WebSocketService {
         trackerId: this.trackerId,
         data: locationData
       });
+      
+      // In simulation mode, we'll also store the location in localStorage
+      // so other tabs or the service worker can access it
+      try {
+        localStorage.setItem(`location_${this.trackerId}`, JSON.stringify(locationData));
+      } catch (error) {
+        console.error('Error storing location in localStorage:', error);
+      }
+      
       return;
     }
 
@@ -137,8 +146,32 @@ export class MapWebSocketService {
       if (IS_WEBSOCKET_SIMULATION) {
         console.log('SIMULATION MODE: Map WebSocket connection simulated');
         
+        // First check if we have stored location data for this trackerId
+        try {
+          const storedLocation = localStorage.getItem(`location_${this.trackerId}`);
+          if (storedLocation) {
+            const locationData = JSON.parse(storedLocation);
+            this.onLocationUpdate(locationData);
+          }
+        } catch (error) {
+          console.error('Error retrieving stored location:', error);
+        }
+        
         // In simulation mode, we'll generate random location updates
         this.simulationInterval = window.setInterval(() => {
+          // Check if there's newer data in localStorage first
+          try {
+            const storedLocation = localStorage.getItem(`location_${this.trackerId}`);
+            if (storedLocation) {
+              const locationData = JSON.parse(storedLocation);
+              this.onLocationUpdate(locationData);
+              return; // Use the stored data instead of generating random data
+            }
+          } catch (error) {
+            console.error('Error retrieving stored location:', error);
+          }
+          
+          // If no stored data, generate random
           // Start with fixed point and add some randomness
           const baseLatitude = 0.0;
           const baseLongitude = 0.0;
@@ -147,7 +180,7 @@ export class MapWebSocketService {
           const randomLng = baseLongitude + (Math.random() * 0.01) - 0.005;
           
           const simulatedData: LocationData = {
-            id: this.trackerId, // Add the required id property
+            id: this.trackerId,
             latitude: randomLat,
             longitude: randomLng,
             accuracy: 10 + Math.random() * 20,
@@ -155,6 +188,13 @@ export class MapWebSocketService {
           };
           
           this.onLocationUpdate(simulatedData);
+          
+          // Also store in localStorage for other components
+          try {
+            localStorage.setItem(`location_${this.trackerId}`, JSON.stringify(simulatedData));
+          } catch (error) {
+            console.error('Error storing location in localStorage:', error);
+          }
         }, 10000); // Simulate update every 10 seconds
         
         setTimeout(resolve, 500); // Simulate connection delay
