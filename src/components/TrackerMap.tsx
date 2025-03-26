@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { LocationData } from '@/utils/locationUtils';
 import { toast } from '@/components/ui/use-toast';
@@ -46,7 +45,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
         try {
           map.current = new mapboxgl.Map({
             container: mapContainer.current,
-            style: 'mapbox://styles/mapbox/light-v11',
+            style: 'mapbox://styles/mapbox/standard', // Updated to Standard style
             center: locationData ? [locationData.longitude, locationData.latitude] : [0, 0],
             zoom: locationData ? 15 : 2,
             pitch: 45,
@@ -60,10 +59,22 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
 
           map.current.on('style.load', () => {
             if (map.current) {
+              // Add 3D terrain
+              map.current.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+              
+              // Add the DEM source as a terrain layer with exaggerated height
+              map.current.addSource('mapbox-dem', {
+                'type': 'raster-dem',
+                'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                'tileSize': 512,
+                'maxzoom': 14
+              });
+              
+              // Add realistic fog
               map.current.setFog({
-                color: 'rgb(255, 255, 255)',
+                'color': 'rgb(255, 255, 255)',
                 'high-color': 'rgb(200, 200, 225)',
-                'horizon-blend': 0.2,
+                'horizon-blend': 0.2
               });
             }
             setMapLoaded(true);
@@ -149,53 +160,103 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
       const accuracyCircleId = 'accuracy-circle';
       
       if (map.current.getSource(accuracyCircleId)) {
-        map.current.getSource(accuracyCircleId).setData({
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [locationData.longitude, locationData.latitude]
-          },
-          properties: {
-            accuracy: locationData.accuracy
+        const source = map.current.getSource(accuracyCircleId);
+        if (source) {
+          source.setData({
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [locationData.longitude, locationData.latitude]
+            },
+            properties: {
+              accuracy: locationData.accuracy
+            }
+          });
+        }
+      } else {
+        // Check if map is fully loaded before adding source
+        if (map.current.loaded()) {
+          try {
+            map.current.addSource(accuracyCircleId, {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [locationData.longitude, locationData.latitude]
+                },
+                properties: {
+                  accuracy: locationData.accuracy
+                }
+              }
+            });
+
+            map.current.addLayer({
+              id: accuracyCircleId,
+              type: 'circle',
+              source: accuracyCircleId,
+              paint: {
+                'circle-radius': {
+                  stops: [
+                    [0, 0],
+                    [20, locationData.accuracy / 2]
+                  ],
+                  base: 2
+                },
+                'circle-color': '#3B82F6',
+                'circle-opacity': 0.15,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#3B82F6',
+                'circle-stroke-opacity': 0.3
+              }
+            });
+          } catch (e) {
+            console.warn('Could not add accuracy circle', e);
           }
-        });
-      } else if (map.current.loaded()) {
-        try {
-          map.current.addSource(accuracyCircleId, {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [locationData.longitude, locationData.latitude]
-              },
-              properties: {
-                accuracy: locationData.accuracy
+        } else {
+          // If map is not fully loaded, wait for the load event
+          map.current.on('load', () => {
+            // Only add the source if it doesn't already exist
+            if (!map.current.getSource(accuracyCircleId)) {
+              try {
+                map.current.addSource(accuracyCircleId, {
+                  type: 'geojson',
+                  data: {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'Point',
+                      coordinates: [locationData.longitude, locationData.latitude]
+                    },
+                    properties: {
+                      accuracy: locationData.accuracy
+                    }
+                  }
+                });
+
+                map.current.addLayer({
+                  id: accuracyCircleId,
+                  type: 'circle',
+                  source: accuracyCircleId,
+                  paint: {
+                    'circle-radius': {
+                      stops: [
+                        [0, 0],
+                        [20, locationData.accuracy / 2]
+                      ],
+                      base: 2
+                    },
+                    'circle-color': '#3B82F6',
+                    'circle-opacity': 0.15,
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#3B82F6',
+                    'circle-stroke-opacity': 0.3
+                  }
+                });
+              } catch (e) {
+                console.warn('Could not add accuracy circle on load', e);
               }
             }
           });
-
-          map.current.addLayer({
-            id: accuracyCircleId,
-            type: 'circle',
-            source: accuracyCircleId,
-            paint: {
-              'circle-radius': {
-                stops: [
-                  [0, 0],
-                  [20, locationData.accuracy / 2]
-                ],
-                base: 2
-              },
-              'circle-color': '#3B82F6',
-              'circle-opacity': 0.15,
-              'circle-stroke-width': 1,
-              'circle-stroke-color': '#3B82F6',
-              'circle-stroke-opacity': 0.3
-            }
-          });
-        } catch (e) {
-          console.warn('Could not add accuracy circle', e);
         }
       }
     } catch (error) {
