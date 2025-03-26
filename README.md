@@ -33,18 +33,25 @@ npm run dev
 
 For the application to work properly, you need to:
 
-1. **Get a Mapbox Token**:
-   - Create a free account at [mapbox.com](https://mapbox.com)
-   - Get your public access token from the dashboard
-   - Enter this token when prompted by the application
+1. **Mapbox Token**:
+   - A default Mapbox token is included for demonstration
+   - You can use your own token by entering it in the app's map interface
+   - Or create a free account at [mapbox.com](https://mapbox.com) and get your public access token
 
-2. **Run the WebSocket Server** (for real-time location updates):
+2. **Run the WebSocket Server** (for real-time location updates in production):
    - A simple WebSocket server is included in `src/server/server.js`
    - Install the WebSocket dependency: `npm install ws`
    - Run the server: `node src/server/server.js`
    - The server will listen on port 8081
 
-**Note**: In the preview environment, the application runs in simulation mode and doesn't require a real WebSocket server.
+**Note**: In the preview environment, the application runs in simulation mode and automatically generates location data for testing purposes. No real WebSocket connection is required in the preview.
+
+## Browser Compatibility
+
+This application requires WebGL support for map rendering. If you encounter map display issues:
+- Try using a different browser (Chrome, Firefox, Edge recommended)
+- Make sure your device supports WebGL
+- Update your graphics drivers if necessary
 
 ## How To Use
  - Create a tracking link

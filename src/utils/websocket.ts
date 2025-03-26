@@ -1,4 +1,3 @@
-
 import { LocationData } from './locationUtils';
 
 // For development and preview, we'll simulate the WebSocket service
@@ -146,13 +145,14 @@ export class MapWebSocketService {
           const randomLat = baseLatitude + (Math.random() * 0.01) - 0.005;
           const randomLng = baseLongitude + (Math.random() * 0.01) - 0.005;
           
-          this.onLocationUpdate({
+          const simulatedData: LocationData = {
             latitude: randomLat,
             longitude: randomLng,
             accuracy: 10 + Math.random() * 20,
-            timestamp: Date.now(),
-            trackerId: this.trackerId
-          });
+            timestamp: Date.now()
+          };
+          
+          this.onLocationUpdate(simulatedData);
         }, 10000); // Simulate update every 10 seconds
         
         setTimeout(resolve, 500); // Simulate connection delay

@@ -5,15 +5,18 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 
-// We'll use a state variable to store the token instead of hardcoding it
+// Set default token to the provided public token
+const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
+
 const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
   const marker = useRef<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapboxLoaded, setMapboxLoaded] = useState(false);
-  const [mapboxToken, setMapboxToken] = useState<string>('');
-  const [showTokenInput, setShowTokenInput] = useState(true);
+  const [mapboxToken, setMapboxToken] = useState<string>(localStorage.getItem('mapbox_token') || DEFAULT_MAPBOX_TOKEN);
+  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   // Dynamically import mapbox-gl
   useEffect(() => {
@@ -36,6 +39,8 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
             zoom: locationData ? 15 : 2,
             pitch: 45,
             attributionControl: false,
+            antialias: true,
+            failIfMajorPerformanceCaveat: false // Add this to improve compatibility
           });
 
           map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -50,6 +55,17 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
               });
             }
             setMapLoaded(true);
+            setMapError(null);
+          });
+          
+          map.current.on('error', (e: any) => {
+            console.error('Map error:', e);
+            if (e.error && e.error.status === 401) {
+              setMapError('Invalid Mapbox token. Please provide a valid token.');
+              setShowTokenInput(true);
+            } else {
+              setMapError('Error loading map. Please try with a different browser or device.');
+            }
           });
         } catch (error) {
           console.error('Error initializing map:', error);
@@ -59,7 +75,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
             variant: 'destructive',
           });
           setShowTokenInput(true);
-          setMapboxToken('');
+          setMapError('Failed to initialize map');
         }
       } catch (error) {
         console.error('Error loading Mapbox GL:', error);
@@ -68,6 +84,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
           description: 'Failed to load map library',
           variant: 'destructive',
         });
+        setMapError('Failed to load map library');
       }
     };
 
@@ -131,39 +148,45 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
           }
         });
       } else {
-        map.current.addSource(accuracyCircleId, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [locationData.longitude, locationData.latitude]
-            },
-            properties: {
-              accuracy: locationData.accuracy
-            }
-          }
-        });
+        if (map.current.loaded()) {
+          try {
+            map.current.addSource(accuracyCircleId, {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [locationData.longitude, locationData.latitude]
+                },
+                properties: {
+                  accuracy: locationData.accuracy
+                }
+              }
+            });
 
-        map.current.addLayer({
-          id: accuracyCircleId,
-          type: 'circle',
-          source: accuracyCircleId,
-          paint: {
-            'circle-radius': {
-              stops: [
-                [0, 0],
-                [20, locationData.accuracy / 2]
-              ],
-              base: 2
-            },
-            'circle-color': '#3B82F6',
-            'circle-opacity': 0.15,
-            'circle-stroke-width': 1,
-            'circle-stroke-color': '#3B82F6',
-            'circle-stroke-opacity': 0.3
+            map.current.addLayer({
+              id: accuracyCircleId,
+              type: 'circle',
+              source: accuracyCircleId,
+              paint: {
+                'circle-radius': {
+                  stops: [
+                    [0, 0],
+                    [20, locationData.accuracy / 2]
+                  ],
+                  base: 2
+                },
+                'circle-color': '#3B82F6',
+                'circle-opacity': 0.15,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#3B82F6',
+                'circle-stroke-opacity': 0.3
+              }
+            });
+          } catch (e) {
+            console.warn('Could not add accuracy circle', e);
           }
-        });
+        }
       }
     } catch (error) {
       console.error('Error updating marker:', error);
@@ -178,20 +201,28 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
     if (input.value.trim()) {
       setMapboxToken(input.value.trim());
       setShowTokenInput(false);
+      setMapError(null);
       
       // Store token in localStorage for future use
       localStorage.setItem('mapbox_token', input.value.trim());
     }
   };
 
-  // Check localStorage for token on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem('mapbox_token');
-    if (savedToken) {
-      setMapboxToken(savedToken);
-      setShowTokenInput(false);
+  const handleResetToken = () => {
+    // Reset to default token
+    setMapboxToken(DEFAULT_MAPBOX_TOKEN);
+    localStorage.setItem('mapbox_token', DEFAULT_MAPBOX_TOKEN);
+    setShowTokenInput(false);
+    setMapError(null);
+    
+    // Reload the map
+    if (map.current) {
+      map.current.remove();
+      map.current = null;
     }
-  }, []);
+    setMapLoaded(false);
+    setMapboxLoaded(false);
+  };
 
   return (
     <div className="relative w-full h-full min-h-[400px] rounded-2xl overflow-hidden shadow-lg">
@@ -199,22 +230,33 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-4">
           <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full">
             <h3 className="text-lg font-medium mb-4">Mapbox Token Required</h3>
+            {mapError && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-800 rounded-md text-sm">
+                {mapError}
+              </div>
+            )}
             <p className="text-sm text-muted-foreground mb-4">
               Please enter your Mapbox public access token to display the map. You can get one by creating a free account at{' '}
               <a href="https://mapbox.com" target="_blank" rel="noopener noreferrer" className="text-geo-blue hover:underline">
                 mapbox.com
               </a>
             </p>
-            <form onSubmit={handleTokenSubmit}>
+            <form onSubmit={handleTokenSubmit} className="space-y-4">
               <input
                 type="text"
                 name="mapboxToken"
-                placeholder="pk.eyJ1Ijoi..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md mb-4"
+                placeholder="pk.eyJ1..."
+                defaultValue={mapboxToken !== DEFAULT_MAPBOX_TOKEN ? mapboxToken : ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
-              <Button type="submit" className="w-full">
-                Set Token
-              </Button>
+              <div className="flex flex-col space-y-2">
+                <Button type="submit" className="w-full">
+                  Set Custom Token
+                </Button>
+                <Button type="button" variant="outline" onClick={handleResetToken} className="w-full">
+                  Use Default Token
+                </Button>
+              </div>
             </form>
           </div>
         </div>
@@ -229,6 +271,39 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
               </div>
             </div>
           )}
+          {mapError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80 backdrop-blur-sm">
+              <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full">
+                <h3 className="text-lg font-medium mb-4 text-red-600">Map Error</h3>
+                <p className="mb-4">{mapError}</p>
+                <div className="flex space-x-2">
+                  <Button 
+                    onClick={() => setShowTokenInput(true)} 
+                    className="flex-1"
+                  >
+                    Change Token
+                  </Button>
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Reload Page
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="absolute bottom-4 right-4 z-10">
+            <Button 
+              onClick={() => setShowTokenInput(true)} 
+              variant="outline" 
+              size="sm"
+              className="bg-white/80 hover:bg-white shadow-md"
+            >
+              Change Map Token
+            </Button>
+          </div>
         </>
       )}
     </div>
