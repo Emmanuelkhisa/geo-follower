@@ -1,8 +1,11 @@
 
 import { LocationData } from './locationUtils';
 
-// For development, we'll use localhost
-// In production, this would be your actual WebSocket server URL
+// For development and preview, we'll simulate the WebSocket service
+// since a real WebSocket server would need to be running on your own server
+const IS_WEBSOCKET_SIMULATION = true;
+
+// For production, this would be your actual WebSocket server URL
 const WS_URL = window.location.hostname === 'localhost' 
   ? 'ws://localhost:8081' 
   : `wss://${window.location.hostname}:8081`;
@@ -13,6 +16,7 @@ export class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 3000; // 3 seconds
+  private simulatedConnected = false;
   
   constructor(trackerId: string) {
     this.trackerId = trackerId;
@@ -20,6 +24,13 @@ export class WebSocketService {
   
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (IS_WEBSOCKET_SIMULATION) {
+        console.log('SIMULATION MODE: WebSocket connection simulated');
+        this.simulatedConnected = true;
+        setTimeout(resolve, 500); // Simulate connection delay
+        return;
+      }
+
       try {
         this.socket = new WebSocket(`${WS_URL}`);
         
@@ -53,6 +64,15 @@ export class WebSocketService {
   }
   
   sendLocation(locationData: LocationData): void {
+    if (IS_WEBSOCKET_SIMULATION) {
+      console.log('SIMULATION MODE: Location sent to server', {
+        type: 'location',
+        trackerId: this.trackerId,
+        data: locationData
+      });
+      return;
+    }
+
     this.sendMessage({
       type: 'location',
       trackerId: this.trackerId,
@@ -85,6 +105,12 @@ export class WebSocketService {
   }
   
   disconnect(): void {
+    if (IS_WEBSOCKET_SIMULATION) {
+      console.log('SIMULATION MODE: WebSocket disconnected');
+      this.simulatedConnected = false;
+      return;
+    }
+
     if (this.socket) {
       this.socket.close();
       this.socket = null;
@@ -99,6 +125,7 @@ export class MapWebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 3000; // 3 seconds
+  private simulationInterval: number | null = null;
   
   constructor(trackerId: string, onLocationUpdate: (data: LocationData) => void) {
     this.trackerId = trackerId;
@@ -107,6 +134,31 @@ export class MapWebSocketService {
   
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (IS_WEBSOCKET_SIMULATION) {
+        console.log('SIMULATION MODE: Map WebSocket connection simulated');
+        
+        // In simulation mode, we'll generate random location updates
+        this.simulationInterval = window.setInterval(() => {
+          // Start with fixed point and add some randomness
+          const baseLatitude = 0.0;
+          const baseLongitude = 0.0;
+          
+          const randomLat = baseLatitude + (Math.random() * 0.01) - 0.005;
+          const randomLng = baseLongitude + (Math.random() * 0.01) - 0.005;
+          
+          this.onLocationUpdate({
+            latitude: randomLat,
+            longitude: randomLng,
+            accuracy: 10 + Math.random() * 20,
+            timestamp: Date.now(),
+            trackerId: this.trackerId
+          });
+        }, 10000); // Simulate update every 10 seconds
+        
+        setTimeout(resolve, 500); // Simulate connection delay
+        return;
+      }
+
       try {
         this.socket = new WebSocket(`${WS_URL}`);
         
@@ -176,6 +228,13 @@ export class MapWebSocketService {
   }
   
   disconnect(): void {
+    if (IS_WEBSOCKET_SIMULATION && this.simulationInterval !== null) {
+      window.clearInterval(this.simulationInterval);
+      this.simulationInterval = null;
+      console.log('SIMULATION MODE: Map WebSocket disconnected');
+      return;
+    }
+
     if (this.socket) {
       this.socket.close();
       this.socket = null;
