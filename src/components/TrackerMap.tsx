@@ -5,6 +5,8 @@ import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Navigation } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import MapProviderSelector from './MapProviderSelector';
+import GoogleMap from './GoogleMap';
 
 // Set default token to your public token
 const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
@@ -28,6 +30,15 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
   const initialLoadRef = useRef(true);
   const [distance, setDistance] = useState<number | null>(null);
   const [travelTime, setTravelTime] = useState<string | null>(null);
+  const [mapProvider, setMapProvider] = useState<'mapbox' | 'google'>(
+    localStorage.getItem('map_provider') as 'mapbox' | 'google' || 'mapbox'
+  );
+
+  // Handle map provider change
+  const handleProviderChange = (provider: 'mapbox' | 'google') => {
+    setMapProvider(provider);
+    localStorage.setItem('map_provider', provider);
+  };
 
   // Calculate distance between two points in meters
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -62,7 +73,7 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
 
   // Dynamically import mapbox-gl
   useEffect(() => {
-    if (!mapboxToken) return;
+    if (!mapboxToken || mapProvider !== 'mapbox') return;
     
     const loadMapbox = async () => {
       try {
@@ -87,7 +98,7 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
         try {
           map.current = new mapboxgl.Map({
             container: mapContainer.current,
-            style: 'mapbox://styles/mapbox/navigation-night-v1', // Changed to dark street view with buildings
+            style: 'mapbox://styles/mapbox/navigation-night-v1', // Dark street view with buildings
             center: locationData ? [locationData.longitude, locationData.latitude] : [36.8219, 1.2921], // Default to Nairobi if no location
             zoom: locationData ? 15 : 12,
             pitch: 45,
@@ -187,11 +198,11 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
         map.current.remove();
       }
     };
-  }, [mapboxToken]);
+  }, [mapboxToken, mapProvider]);
 
   // Update marker when location data changes
   useEffect(() => {
-    if (!mapLoaded || !locationData || !map.current || !mapboxgl) return;
+    if (!mapLoaded || !locationData || !map.current || !mapboxgl || mapProvider !== 'mapbox') return;
 
     try {
       // Create a blinking marker element for tracked device (RED)
@@ -289,7 +300,6 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
 
             // Add a "current location" marker (BLUE)
             // This is a simulated current device location for demonstration
-            // In a real app, you would get this from the device's GPS
             const currentLocationOffset = 0.001; // Small offset for demonstration
             
             const currentLocationEl = document.createElement('div');
@@ -492,7 +502,7 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
     } catch (error) {
       console.error('Error updating marker:', error);
     }
-  }, [mapLoaded, locationData, mapboxgl, followMode]);
+  }, [mapLoaded, locationData, mapboxgl, followMode, mapProvider]);
 
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -524,6 +534,25 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
     setMapLoaded(false);
     setMapboxLoaded(false);
   };
+
+  // If Google Maps is selected, render GoogleMap component
+  if (mapProvider === 'google') {
+    return (
+      <div className="relative w-full h-full min-h-[400px] rounded-2xl overflow-hidden shadow-lg">
+        <GoogleMap 
+          locationData={locationData} 
+          followMode={followMode} 
+          onToggleFollowMode={onToggleFollowMode} 
+        />
+        <div className="absolute bottom-4 left-4 z-10">
+          <MapProviderSelector
+            provider={mapProvider}
+            onProviderChange={handleProviderChange}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full min-h-[400px] rounded-2xl overflow-hidden shadow-lg">
@@ -655,6 +684,13 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
               <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_5px_rgba(255,0,0,0.7)]"></div>
               <span>Tracked Device</span>
             </div>
+          </div>
+          
+          <div className="absolute bottom-4 left-4 z-10">
+            <MapProviderSelector
+              provider={mapProvider}
+              onProviderChange={handleProviderChange}
+            />
           </div>
         </>
       )}

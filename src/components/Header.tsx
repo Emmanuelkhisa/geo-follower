@@ -1,7 +1,7 @@
 
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
+import { MapPin, Navigation, Map } from "lucide-react";
 
 const Header = () => {
   return (
@@ -24,12 +24,19 @@ const Header = () => {
                 }}
               />
             </div>
-            <span className="text-2xl font-bold text-geo-blue">Geo-Follower</span>
+            <div>
+              <span className="text-2xl font-bold text-geo-blue block">Geo-Follower</span>
+              <span className="text-xs text-gray-500">Powered by Mapbox & Google Maps</span>
+            </div>
           </Link>
           
           <nav className="hidden md:flex items-center space-x-10">
             <NavLink to="/">Home</NavLink>
             <NavLink to="/create">Create Tracker</NavLink>
+            <div className="px-3 py-1 rounded bg-geo-blue/10 text-geo-blue font-medium flex items-center">
+              <Map size={16} className="mr-1" />
+              <span>Dual Map Support</span>
+            </div>
           </nav>
           
           <div className="md:hidden">
