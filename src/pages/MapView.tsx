@@ -367,7 +367,7 @@ const MapView = () => {
           )}
           
           <div className="text-center text-xs text-muted-foreground mt-4">
-            <p>Geo-Follower - Developed by Emmanuel Khisa with love for KENYANS Gen-Z</p>
+            <p>Geo-Follower - Developed by Emmanuel Khisa with love for KENYANS </p>
           </div>
         </div>
       </div>
