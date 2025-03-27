@@ -1,9 +1,9 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { LocationData } from '@/utils/locationUtils';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Navigation } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Set default token to your public token
 const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
@@ -315,38 +315,42 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
   return (
     <div className="relative w-full h-full min-h-[400px] rounded-2xl overflow-hidden shadow-lg">
       {showTokenInput ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-4">
-          <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">Mapbox Token Required</h3>
-            {mapError && (
-              <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-800 rounded-md text-sm">
-                {mapError}
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground mb-4">
-              Please enter your Mapbox public access token to display the map. You can get one by creating a free account at{' '}
-              <a href="https://mapbox.com" target="_blank" rel="noopener noreferrer" className="text-geo-blue hover:underline">
-                mapbox.com
-              </a>
-            </p>
-            <form onSubmit={handleTokenSubmit} className="space-y-4">
-              <input
-                type="text"
-                name="mapboxToken"
-                placeholder="pk.eyJ1..."
-                defaultValue={mapboxToken !== DEFAULT_MAPBOX_TOKEN ? mapboxToken : ''}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-              <div className="flex flex-col space-y-2">
-                <Button type="submit" className="w-full">
-                  Set Custom Token
-                </Button>
-                <Button type="button" variant="outline" onClick={handleResetToken} className="w-full">
-                  Use Default Token
-                </Button>
-              </div>
-            </form>
-          </div>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white p-4">
+          <Card className="max-w-md w-full shadow-xl border-geo-blue/20">
+            <CardHeader className="border-b pb-3">
+              <CardTitle className="text-xl text-geo-blue">Mapbox Token Required</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {mapError && (
+                <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-800 rounded-md text-sm">
+                  {mapError}
+                </div>
+              )}
+              <p className="text-base text-muted-foreground mb-6">
+                Please enter your Mapbox public access token to display the map. You can get one by creating a free account at{' '}
+                <a href="https://mapbox.com" target="_blank" rel="noopener noreferrer" className="text-geo-blue font-medium hover:underline">
+                  mapbox.com
+                </a>
+              </p>
+              <form onSubmit={handleTokenSubmit} className="space-y-4">
+                <input
+                  type="text"
+                  name="mapboxToken"
+                  placeholder="pk.eyJ1..."
+                  defaultValue={mapboxToken !== DEFAULT_MAPBOX_TOKEN ? mapboxToken : ''}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md text-base"
+                />
+                <div className="flex flex-col space-y-3">
+                  <Button type="submit" className="w-full py-5 text-base bg-geo-blue hover:bg-geo-blue/90">
+                    Set Custom Token
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleResetToken} className="w-full py-5 text-base">
+                    Use Default Token
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <>
@@ -355,34 +359,38 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80 backdrop-blur-sm">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-geo-blue mx-auto"></div>
-                <p className="mt-4 text-sm text-gray-500">Loading map...</p>
+                <p className="mt-4 text-lg text-gray-500">Loading map...</p>
               </div>
             </div>
           )}
           {mapError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80 backdrop-blur-sm">
-              <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full">
-                <h3 className="text-lg font-medium mb-4 text-red-600 flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  Map Error
-                </h3>
-                <p className="mb-4">{mapError}</p>
-                <div className="flex space-x-2">
-                  <Button 
-                    onClick={() => setShowTokenInput(true)} 
-                    className="flex-1"
-                  >
-                    Change Token
-                  </Button>
-                  <Button 
-                    onClick={() => window.location.reload()}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Reload Page
-                  </Button>
-                </div>
-              </div>
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-sm">
+              <Card className="max-w-md w-full shadow-xl border-red-200">
+                <CardHeader className="border-b pb-3">
+                  <CardTitle className="text-xl text-red-600 flex items-center">
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    Map Error
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <p className="mb-6 text-base">{mapError}</p>
+                  <div className="flex space-x-3">
+                    <Button 
+                      onClick={() => setShowTokenInput(true)} 
+                      className="flex-1 py-5 text-base bg-geo-blue hover:bg-geo-blue/90"
+                    >
+                      Change Token
+                    </Button>
+                    <Button 
+                      onClick={() => window.location.reload()}
+                      variant="outline"
+                      className="flex-1 py-5 text-base"
+                    >
+                      Reload Page
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
           <div className="absolute bottom-4 right-4 z-10 flex gap-2">
@@ -391,9 +399,9 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
                 onClick={onToggleFollowMode} 
                 variant={followMode ? "default" : "outline"}
                 size="sm"
-                className={followMode ? "bg-geo-blue hover:bg-geo-blue/90" : "bg-white/80 hover:bg-white shadow-md"}
+                className={followMode ? "bg-geo-blue hover:bg-geo-blue/90 text-base px-4 py-2" : "bg-white/90 hover:bg-white shadow-md text-base px-4 py-2"}
               >
-                <Navigation className={followMode ? "animate-pulse" : ""} size={16} />
+                <Navigation className={followMode ? "animate-pulse mr-2" : "mr-2"} size={18} />
                 {followMode ? "Following" : "Follow Device"}
               </Button>
             )}
@@ -401,7 +409,7 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
               onClick={() => setShowTokenInput(true)} 
               variant="outline" 
               size="sm"
-              className="bg-white/80 hover:bg-white shadow-md"
+              className="bg-white/90 hover:bg-white shadow-md text-base px-4 py-2"
             >
               Change Map Token
             </Button>

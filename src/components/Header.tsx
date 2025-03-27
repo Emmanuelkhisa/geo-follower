@@ -5,14 +5,14 @@ import { MapPin } from "lucide-react";
 
 const Header = () => {
   return (
-    <header className="border-b border-border/40 bg-background/80 backdrop-blur-md sticky top-0 z-50">
+    <header className="border-b border-geo-blue/30 bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center space-x-2 group">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-geo-blue text-white">
-              <MapPin size={20} className="group-hover:scale-110 transition-transform duration-300" />
+          <Link to="/" className="flex items-center space-x-3 group">
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-geo-blue text-white">
+              <MapPin size={24} className="group-hover:scale-110 transition-transform duration-300" />
               <motion.div 
-                className="absolute inset-0 rounded-full border border-geo-blue"
+                className="absolute inset-0 rounded-full border-2 border-geo-blue"
                 animate={{ 
                   scale: [1, 1.2, 1], 
                   opacity: [1, 0.5, 0] 
@@ -24,10 +24,10 @@ const Header = () => {
                 }}
               />
             </div>
-            <span className="text-xl font-semibold text-foreground">Geo Man</span>
+            <span className="text-2xl font-bold text-geo-blue">Geo-Follower</span>
           </Link>
           
-          <nav className="hidden md:flex items-center space-x-8">
+          <nav className="hidden md:flex items-center space-x-10">
             <NavLink to="/">Home</NavLink>
             <NavLink to="/create">Create Tracker</NavLink>
           </nav>
@@ -45,7 +45,7 @@ const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) =>
   return (
     <Link 
       to={to} 
-      className="relative text-foreground/80 hover:text-foreground transition-colors duration-200 py-2"
+      className="relative text-foreground/80 hover:text-geo-blue transition-colors duration-200 py-2 text-lg font-medium"
     >
       {children}
       <motion.div 
