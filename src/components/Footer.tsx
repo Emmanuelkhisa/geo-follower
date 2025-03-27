@@ -47,7 +47,7 @@ const Footer = () => {
         
         <div className="mt-8 pt-4 border-t border-geo-blue/20 flex flex-col md:flex-row items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Geo-Follower. Developed by Emmanuel Khisa with love for KENYANS Gen-Z
+            &copy; {new Date().getFullYear()} Geo-Follower. Developed by Emmanuel Khisa with love for KENYANS
           </p>
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
             <Map size={18} className="text-geo-blue" />
