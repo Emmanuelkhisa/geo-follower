@@ -145,7 +145,7 @@ const Index = () => {
         className="mt-16 text-center pb-8"
       >
         <p className="text-muted-foreground text-lg">
-          Developed by Emmanuel Khisa with love for KENYANS Gen-Z
+          Developed by Emmanuel Khisa with love for KENYANS 
         </p>
       </motion.div>
     </div>
