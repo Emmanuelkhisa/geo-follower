@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 import { LocationData } from '@/utils/locationUtils';
 import { toast } from '@/components/ui/use-toast';
@@ -53,7 +54,7 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
         try {
           map.current = new mapboxgl.Map({
             container: mapContainer.current,
-            style: 'mapbox://styles/mapbox/streets-v12', // Using streets style for better location context
+            style: 'mapbox://styles/mapbox/satellite-streets-v12', // Changed to satellite-streets style
             center: locationData ? [locationData.longitude, locationData.latitude] : [36.8219, 1.2921], // Default to Nairobi if no location
             zoom: locationData ? 15 : 12,
             pitch: 45,
@@ -135,19 +136,19 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
     if (!mapLoaded || !locationData || !map.current || !mapboxgl) return;
 
     try {
-      // Create a blinking marker element
+      // Create a blinking marker element for tracked device (RED)
       const el = document.createElement('div');
       el.className = 'relative w-8 h-8';
       
       const innerDiv = document.createElement('div');
-      innerDiv.className = 'absolute w-8 h-8 bg-geo-blue rounded-full flex items-center justify-center animate-pulse';
+      innerDiv.className = 'absolute w-8 h-8 bg-red-600 rounded-full flex items-center justify-center animate-pulse';
       
       const dot = document.createElement('div');
       dot.className = 'w-3 h-3 bg-white rounded-full';
       
       // Add a pulse animation effect
       const pulseRing = document.createElement('div');
-      pulseRing.className = 'absolute w-8 h-8 rounded-full border-4 border-geo-blue animate-ping opacity-75';
+      pulseRing.className = 'absolute w-8 h-8 rounded-full border-4 border-red-600 animate-ping opacity-75';
       
       el.appendChild(pulseRing);
       innerDiv.appendChild(dot);
@@ -173,7 +174,7 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
         initialLoadRef.current = false;
       }
 
-      // Add accuracy circle if not already added
+      // Add accuracy circle if not already added (YELLOW for path/route)
       const accuracyCircleId = 'accuracy-circle';
       
       if (map.current.getSource(accuracyCircleId)) {
@@ -220,13 +221,38 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
                   ],
                   base: 2
                 },
-                'circle-color': '#3B82F6',
+                'circle-color': '#FFD700', // Yellow color for path/route
                 'circle-opacity': 0.15,
                 'circle-stroke-width': 1,
-                'circle-stroke-color': '#3B82F6',
+                'circle-stroke-color': '#FFD700', // Yellow color for path/route
                 'circle-stroke-opacity': 0.3
               }
             });
+
+            // Add a "current location" marker (BLUE)
+            // This is a simulated current device location for demonstration
+            // In a real app, you would get this from the device's GPS
+            const currentLocationOffset = 0.001; // Small offset for demonstration
+            
+            const currentLocationEl = document.createElement('div');
+            currentLocationEl.className = 'relative w-6 h-6';
+            
+            const currentInnerDiv = document.createElement('div');
+            currentInnerDiv.className = 'absolute w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center';
+            
+            const currentDot = document.createElement('div');
+            currentDot.className = 'w-2 h-2 bg-white rounded-full';
+            
+            currentInnerDiv.appendChild(currentDot);
+            currentLocationEl.appendChild(currentInnerDiv);
+
+            new mapboxgl.Marker(currentLocationEl)
+              .setLngLat([
+                locationData.longitude + currentLocationOffset,
+                locationData.latitude + currentLocationOffset
+              ])
+              .addTo(map.current);
+              
           } catch (e) {
             console.warn('Could not add accuracy circle', e);
           }
@@ -262,13 +288,35 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
                       ],
                       base: 2
                     },
-                    'circle-color': '#3B82F6',
+                    'circle-color': '#FFD700', // Yellow color for path/route
                     'circle-opacity': 0.15,
                     'circle-stroke-width': 1,
-                    'circle-stroke-color': '#3B82F6',
+                    'circle-stroke-color': '#FFD700', // Yellow color for path/route
                     'circle-stroke-opacity': 0.3
                   }
                 });
+                
+                // Add a "current location" marker (BLUE)
+                const currentLocationOffset = 0.001; // Small offset for demonstration
+                
+                const currentLocationEl = document.createElement('div');
+                currentLocationEl.className = 'relative w-6 h-6';
+                
+                const currentInnerDiv = document.createElement('div');
+                currentInnerDiv.className = 'absolute w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center';
+                
+                const currentDot = document.createElement('div');
+                currentDot.className = 'w-2 h-2 bg-white rounded-full';
+                
+                currentInnerDiv.appendChild(currentDot);
+                currentLocationEl.appendChild(currentInnerDiv);
+
+                new mapboxgl.Marker(currentLocationEl)
+                  .setLngLat([
+                    locationData.longitude + currentLocationOffset,
+                    locationData.latitude + currentLocationOffset
+                  ])
+                  .addTo(map.current);
               } catch (e) {
                 console.warn('Could not add accuracy circle on load', e);
               }
@@ -413,6 +461,20 @@ const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: Tr
             >
               Change Map Token
             </Button>
+          </div>
+          <div className="absolute top-4 left-4 z-10 bg-white/90 p-3 rounded-md shadow-md text-xs">
+            <div className="flex items-center gap-1 mb-1">
+              <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+              <span>Current Device</span>
+            </div>
+            <div className="flex items-center gap-1 mb-1">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>Path/Route</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-red-600"></div>
+              <span>Tracked Device</span>
+            </div>
           </div>
         </>
       )}
