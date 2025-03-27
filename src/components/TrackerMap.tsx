@@ -1,13 +1,20 @@
+
 import { useEffect, useRef, useState } from 'react';
 import { LocationData } from '@/utils/locationUtils';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Navigation } from 'lucide-react';
 
 // Set default token to your public token
 const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
 
-const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => {
+interface TrackerMapProps {
+  locationData: LocationData | null;
+  followMode?: boolean;
+  onToggleFollowMode?: () => void;
+}
+
+const TrackerMap = ({ locationData, followMode = false, onToggleFollowMode }: TrackerMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
   const marker = useRef<any>(null);
@@ -17,6 +24,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapboxgl, setMapboxgl] = useState<any>(null);
+  const initialLoadRef = useRef(true);
 
   // Dynamically import mapbox-gl
   useEffect(() => {
@@ -45,9 +53,9 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
         try {
           map.current = new mapboxgl.Map({
             container: mapContainer.current,
-            style: 'mapbox://styles/mapbox/standard', // Updated to Standard style
-            center: locationData ? [locationData.longitude, locationData.latitude] : [0, 0],
-            zoom: locationData ? 15 : 2,
+            style: 'mapbox://styles/mapbox/streets-v12', // Using streets style for better location context
+            center: locationData ? [locationData.longitude, locationData.latitude] : [36.8219, 1.2921], // Default to Nairobi if no location
+            zoom: locationData ? 15 : 12,
             pitch: 45,
             attributionControl: false,
             antialias: true,
@@ -120,22 +128,28 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
         map.current.remove();
       }
     };
-  }, [mapboxToken, locationData]);
+  }, [mapboxToken]);
 
   // Update marker when location data changes
   useEffect(() => {
     if (!mapLoaded || !locationData || !map.current || !mapboxgl) return;
 
     try {
+      // Create a blinking marker element
       const el = document.createElement('div');
-      el.className = 'relative w-5 h-5';
+      el.className = 'relative w-8 h-8';
       
       const innerDiv = document.createElement('div');
-      innerDiv.className = 'absolute w-5 h-5 bg-geo-blue rounded-full flex items-center justify-center location-pulse';
+      innerDiv.className = 'absolute w-8 h-8 bg-geo-blue rounded-full flex items-center justify-center animate-pulse';
       
       const dot = document.createElement('div');
-      dot.className = 'w-2 h-2 bg-white rounded-full';
+      dot.className = 'w-3 h-3 bg-white rounded-full';
       
+      // Add a pulse animation effect
+      const pulseRing = document.createElement('div');
+      pulseRing.className = 'absolute w-8 h-8 rounded-full border-4 border-geo-blue animate-ping opacity-75';
+      
+      el.appendChild(pulseRing);
       innerDiv.appendChild(dot);
       el.appendChild(innerDiv);
 
@@ -147,14 +161,17 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
         .setLngLat([locationData.longitude, locationData.latitude])
         .addTo(map.current);
 
-      // Fly to the location with animation
-      map.current.flyTo({
-        center: [locationData.longitude, locationData.latitude],
-        zoom: 15,
-        speed: 1.5,
-        curve: 1,
-        essential: true
-      });
+      // Fly to the location with animation if in follow mode or initial load
+      if (followMode || initialLoadRef.current) {
+        map.current.flyTo({
+          center: [locationData.longitude, locationData.latitude],
+          zoom: 15,
+          speed: 1.5,
+          curve: 1,
+          essential: true
+        });
+        initialLoadRef.current = false;
+      }
 
       // Add accuracy circle if not already added
       const accuracyCircleId = 'accuracy-circle';
@@ -262,7 +279,7 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
     } catch (error) {
       console.error('Error updating marker:', error);
     }
-  }, [mapLoaded, locationData, mapboxgl]);
+  }, [mapLoaded, locationData, mapboxgl, followMode]);
 
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,7 +385,18 @@ const TrackerMap = ({ locationData }: { locationData: LocationData | null }) => 
               </div>
             </div>
           )}
-          <div className="absolute bottom-4 right-4 z-10">
+          <div className="absolute bottom-4 right-4 z-10 flex gap-2">
+            {onToggleFollowMode && locationData && (
+              <Button 
+                onClick={onToggleFollowMode} 
+                variant={followMode ? "default" : "outline"}
+                size="sm"
+                className={followMode ? "bg-geo-blue hover:bg-geo-blue/90" : "bg-white/80 hover:bg-white shadow-md"}
+              >
+                <Navigation className={followMode ? "animate-pulse" : ""} size={16} />
+                {followMode ? "Following" : "Follow Device"}
+              </Button>
+            )}
             <Button 
               onClick={() => setShowTokenInput(true)} 
               variant="outline" 

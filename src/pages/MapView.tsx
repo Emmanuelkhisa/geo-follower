@@ -1,11 +1,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, Clock, LocateFixed, Bookmark } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, LocateFixed, Bookmark, Navigation, ShieldAlert, Baby, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { MapWebSocketService } from "@/utils/websocket";
 import { 
   LocationData, 
@@ -24,6 +25,8 @@ const MapView = () => {
   const [error, setError] = useState<string | null>(null);
   const [showManagement, setShowManagement] = useState(false);
   const [trackerName, setTrackerName] = useState<string | null>(null);
+  const [followMode, setFollowMode] = useState(true);
+  const [adMessage, setAdMessage] = useState<string>("");
 
   useEffect(() => {
     if (!trackerId) {
@@ -37,6 +40,24 @@ const MapView = () => {
     if (saved) {
       setTrackerName(saved.name);
     }
+
+    // Cycle through advertising messages
+    const adMessages = [
+      "Keep your children safe! Track their location in real-time.",
+      "Worried about your teenager? Stay connected and ensure their safety.",
+      "Protect your valuable devices from theft with real-time tracking.",
+      "Going hiking? Share your location with loved ones for safety.",
+      "Keeping Kenyans safe, one location at a time.",
+    ];
+    
+    let currentAdIndex = 0;
+    const adInterval = setInterval(() => {
+      setAdMessage(adMessages[currentAdIndex]);
+      currentAdIndex = (currentAdIndex + 1) % adMessages.length;
+    }, 8000);
+    
+    // Set initial ad message
+    setAdMessage(adMessages[0]);
 
     // Handle incoming location updates
     const handleLocationUpdate = (data: LocationData) => {
@@ -77,12 +98,36 @@ const MapView = () => {
     // Clean up
     return () => {
       wsService.disconnect();
+      clearInterval(adInterval);
     };
   }, [trackerId, toast]);
 
   const handleSelectTracker = (selectedTrackerId: string) => {
     if (selectedTrackerId !== trackerId) {
       navigate(`/map/${selectedTrackerId}`);
+    }
+  };
+
+  const toggleFollowMode = () => {
+    setFollowMode(prev => !prev);
+    
+    toast({
+      title: followMode ? "Follow Mode Disabled" : "Follow Mode Enabled",
+      description: followMode 
+        ? "You can now manually navigate the map" 
+        : "Map will automatically follow device location",
+      duration: 3000,
+    });
+  };
+
+  const getAdIcon = () => {
+    const adText = adMessage.toLowerCase();
+    if (adText.includes("children") || adText.includes("kid")) {
+      return <Baby className="h-5 w-5 text-geo-blue" />;
+    } else if (adText.includes("device") || adText.includes("theft")) {
+      return <Package className="h-5 w-5 text-geo-blue" />;
+    } else {
+      return <ShieldAlert className="h-5 w-5 text-geo-blue" />;
     }
   };
 
@@ -111,6 +156,25 @@ const MapView = () => {
         </p>
       </div>
       
+      {adMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-6"
+        >
+          <Alert variant="default" className="bg-geo-blue/5 border-geo-blue/20">
+            <div className="flex items-center gap-2">
+              {getAdIcon()}
+              <AlertTitle className="text-geo-blue">{adMessage}</AlertTitle>
+            </div>
+            <AlertDescription className="pl-7 text-sm mt-1">
+              Track your loved ones and valuable items in real-time with Geo-Follower
+            </AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
         <div className="lg:col-span-2 h-[60vh] lg:h-auto">
           <motion.div
@@ -119,7 +183,11 @@ const MapView = () => {
             transition={{ duration: 0.5 }}
             className="h-full relative"
           >
-            <TrackerMap locationData={locationData} />
+            <TrackerMap 
+              locationData={locationData} 
+              followMode={followMode}
+              onToggleFollowMode={toggleFollowMode}
+            />
             
             {error && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
@@ -220,6 +288,18 @@ const MapView = () => {
                           ±{locationData.accuracy.toFixed(1)} meters
                         </div>
                       </div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Follow Mode</div>
+                        <Button
+                          onClick={toggleFollowMode}
+                          variant={followMode ? "default" : "outline"}
+                          className={`w-full flex items-center gap-2 ${followMode ? "bg-geo-blue hover:bg-geo-blue/90" : ""}`}
+                        >
+                          <Navigation className={followMode ? "animate-pulse" : ""} size={16} />
+                          {followMode ? "Following Device" : "Follow Device"}
+                        </Button>
+                      </div>
                     </>
                   ) : (
                     <div className="py-8 text-center">
@@ -287,7 +367,7 @@ const MapView = () => {
           )}
           
           <div className="text-center text-xs text-muted-foreground mt-4">
-            <p>Geo-Follower - Developed by Emmanuel Khisa</p>
+            <p>Geo-Follower - Developed by Emmanuel Khisa with love for KENYANS Gen-Z</p>
           </div>
         </div>
       </div>
