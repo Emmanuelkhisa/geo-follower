@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { calculateDistance, calculateTravelTime } from '@/utils/mapUtils';
 
 interface GoogleMapProps {
   locationData: LocationData | null;
@@ -34,37 +35,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
   const [mapType, setMapType] = useState('roadmap');
   const [distance, setDistance] = useState<number | null>(null);
   const [travelTime, setTravelTime] = useState<string | null>(null);
-
-  // Calculate distance between two points in meters
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = lat1 * Math.PI/180;
-    const φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180;
-    const Δλ = (lon2-lon1) * Math.PI/180;
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  // Calculate estimated travel time based on walking speed (4 km/h)
-  const calculateTravelTime = (distanceInMeters: number): string => {
-    const walkingSpeedMetersPerMinute = 4000 / 60;
-    const minutes = Math.round(distanceInMeters / walkingSpeedMetersPerMinute);
-    
-    if (minutes < 1) {
-      return "Less than a minute";
-    } else if (minutes < 60) {
-      return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-    } else {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return `${hours} hour${hours === 1 ? '' : 's'}${remainingMinutes > 0 ? ` ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}` : ''}`;
-    }
-  };
 
   // Dynamically load Google Maps API
   useEffect(() => {
@@ -165,13 +135,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
       map.current = new google.maps.Map(mapContainer.current, mapOptions);
       setMapLoaded(true);
       setMapError(null);
-      
-      // Add map type control manually
-      const mapTypeControl = document.createElement('div');
-      mapTypeControl.className = 'absolute top-4 left-1/2 transform -translate-x-1/2 z-10';
-      mapContainer.current.appendChild(mapTypeControl);
-      
-      // React will render into this element later
       
     } catch (error) {
       console.error('Error initializing Google Maps:', error);
