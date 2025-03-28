@@ -26,7 +26,7 @@ const Header = () => {
             </div>
             <div>
               <span className="text-2xl font-bold text-geo-blue block">Geo-Follower</span>
-              <span className="text-xs text-gray-500">Powered by Mapbox & Google Maps</span>
+              <span className="text-xs text-gray-500">WHERE ARE YOU?</span>
             </div>
           </Link>
           
