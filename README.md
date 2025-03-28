@@ -31,18 +31,12 @@ npm run dev
 
 For the application to work properly, you need to:
 
-1. **Mapbox Token**:
-   - A default Mapbox token is included for demonstration
-   - You can use your own token by entering it in the app's map interface
-   - Or create a free account at [mapbox.com](https://mapbox.com) and get your public access token
 
-2. **Run the WebSocket Server** (for real-time location updates in production):
+1. **Run the WebSocket Server** (for real-time location updates in production):
    - A simple WebSocket server is included in `src/server/server.js`
    - Install the WebSocket dependency: `npm install ws`
    - Run the server: `node src/server/server.js`
    - The server will listen on port 8081
-
-**Note**: In the preview environment, the application runs in simulation mode and automatically generates location data for testing purposes. No real WebSocket connection is required in the preview.
 
 ## Browser Compatibility
 
