@@ -31,22 +31,35 @@ export const createMapLegend = () => {
 // Create a utility function to create map markers
 export const createLocationMarker = (isTrackedDevice: boolean) => {
   const size = 10;  // Make all markers the same size for consistency
-  const color = 'red';  // All tracked devices are red
-  const glowColor = 'rgba(255,0,0,0.7)';
   
   const el = document.createElement('div');
-  el.className = `relative w-${size} h-${size}`; 
+  el.className = 'relative flex items-center justify-center'; 
+  el.style.width = `${size * 2}px`;
+  el.style.height = `${size * 2}px`;
   
   // Add a pulse animation effect for tracked device
-  const pulseRing = document.createElement('div');
-  pulseRing.className = `absolute w-${size} h-${size} rounded-full border-4 border-red-600 animate-ping opacity-75`;
-  el.appendChild(pulseRing);
+  if (isTrackedDevice) {
+    const pulseRing = document.createElement('div');
+    pulseRing.className = 'absolute rounded-full animate-ping';
+    pulseRing.style.width = `${size * 2}px`;
+    pulseRing.style.height = `${size * 2}px`;
+    pulseRing.style.border = '4px solid #ef4444'; // red-500
+    pulseRing.style.opacity = '0.75';
+    el.appendChild(pulseRing);
+  }
   
   const innerDiv = document.createElement('div');
-  innerDiv.className = `absolute w-${size} h-${size} bg-${color}-600 rounded-full flex items-center justify-center animate-pulse shadow-[0_0_15px_${glowColor}]`;
+  innerDiv.className = 'absolute rounded-full flex items-center justify-center animate-pulse';
+  innerDiv.style.width = `${size * 2}px`;
+  innerDiv.style.height = `${size * 2}px`;
+  innerDiv.style.backgroundColor = '#dc2626'; // red-600
+  innerDiv.style.boxShadow = '0 0 15px rgba(255, 0, 0, 0.7)';
   
   const dot = document.createElement('div');
-  dot.className = `w-${size/2} h-${size/2} bg-white rounded-full`;
+  dot.className = 'rounded-full';
+  dot.style.width = `${size}px`;
+  dot.style.height = `${size}px`;
+  dot.style.backgroundColor = '#ffffff'; // white
   
   innerDiv.appendChild(dot);
   el.appendChild(innerDiv);

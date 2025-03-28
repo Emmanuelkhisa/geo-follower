@@ -24,11 +24,13 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
   const map = useRef<google.maps.Map | null>(null);
   const trackedMarker = useRef<google.maps.Marker | null>(null);
   const accuracyCircle = useRef<google.maps.Circle | null>(null);
+  const locationRef = useRef<LocationData | null>(null);
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapType, setMapType] = useState('roadmap');
+  const initialLoadRef = useRef(true);
 
   // Dynamically load Google Maps API
   useEffect(() => {
@@ -130,6 +132,11 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
       setMapLoaded(true);
       setMapError(null);
       
+      // Create initial marker if location data is available
+      if (locationData) {
+        updateMarkerAndCircle(locationData);
+      }
+      
     } catch (error) {
       console.error('Error initializing Google Maps:', error);
       setMapError('Failed to initialize Google Maps. Please check your browser compatibility.');
@@ -140,19 +147,22 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
       if (trackedMarker.current) trackedMarker.current.setMap(null);
       if (accuracyCircle.current) accuracyCircle.current.setMap(null);
     };
-  }, [googleMapsLoaded, locationData, mapType]);
+  }, [googleMapsLoaded, mapType]);
 
-  // Update marker when location data changes
-  useEffect(() => {
-    if (!mapLoaded || !locationData || !map.current) return;
-
+  // Function to update marker and accuracy circle
+  const updateMarkerAndCircle = (location: LocationData) => {
+    if (!map.current) return;
+    
     try {
+      // Store current location
+      locationRef.current = location;
+      
       const trackedPosition = { 
-        lat: locationData.latitude, 
-        lng: locationData.longitude 
+        lat: location.latitude, 
+        lng: location.longitude 
       };
       
-      // Create tracked device marker (RED)
+      // Create or update tracked device marker (RED)
       if (!trackedMarker.current) {
         trackedMarker.current = new google.maps.Marker({
           position: trackedPosition,
@@ -172,12 +182,12 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
         trackedMarker.current.setPosition(trackedPosition);
       }
       
-      // Add accuracy circle
+      // Add or update accuracy circle
       if (!accuracyCircle.current) {
         accuracyCircle.current = new google.maps.Circle({
           map: map.current,
           center: trackedPosition,
-          radius: locationData.accuracy,
+          radius: location.accuracy,
           strokeColor: '#FF0000',
           strokeOpacity: 0.8,
           strokeWeight: 2,
@@ -187,18 +197,26 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
         });
       } else {
         accuracyCircle.current.setCenter(trackedPosition);
-        accuracyCircle.current.setRadius(locationData.accuracy);
+        accuracyCircle.current.setRadius(location.accuracy);
       }
       
-      // Fly to the location with animation if in follow mode
-      if (followMode) {
+      // Fly to the location with animation if in follow mode or initial load
+      if (followMode || initialLoadRef.current) {
+        initialLoadRef.current = false;
         map.current.panTo(trackedPosition);
       }
     } catch (error) {
       console.error('Error updating Google Maps markers:', error);
     }
+  };
+
+  // Update marker when location data changes
+  useEffect(() => {
+    if (!mapLoaded || !locationData) return;
+    updateMarkerAndCircle(locationData);
   }, [mapLoaded, locationData, followMode]);
 
+  // Handle map type change
   const handleMapTypeChange = (value: string) => {
     setMapType(value);
     if (map.current) {

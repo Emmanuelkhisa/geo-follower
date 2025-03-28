@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { LocationData } from '@/utils/locationUtils';
 import { toast } from '@/components/ui/use-toast';
@@ -27,6 +26,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapboxgl, setMapboxgl] = useState<any>(null);
   const initialLoadRef = useRef(true);
+  const locationRef = useRef<LocationData | null>(null);
 
   // Dynamically import mapbox-gl
   useEffect(() => {
@@ -117,6 +117,11 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                 const legendElement = createMapLegend();
                 mapContainer.current.appendChild(legendElement);
               }
+
+              // Create initial marker if location data is available
+              if (locationData) {
+                updateMarkerAndAccuracy(locationData);
+              }
             }
             setMapLoaded(true);
             setMapError(null);
@@ -161,143 +166,109 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
         map.current.remove();
       }
     };
-  }, [mapboxToken, locationData]);
+  }, [mapboxToken]);
 
-  // Update marker when location data changes
-  useEffect(() => {
-    if (!mapLoaded || !locationData || !map.current || !mapboxgl) return;
-
+  // Create function to update marker and accuracy circle
+  const updateMarkerAndAccuracy = (location: LocationData) => {
+    if (!map.current || !mapboxgl) return;
+    
     try {
+      // Store the current location
+      locationRef.current = location;
+      
       // Create a blinking marker element for tracked device (RED)
-      const el = createLocationMarker(true);
-
-      if (marker.current) {
-        marker.current.remove();
+      const coordinates = [location.longitude, location.latitude];
+      
+      // Update or create marker
+      if (!marker.current) {
+        const el = createLocationMarker(true);
+        marker.current = new mapboxgl.Marker(el)
+          .setLngLat(coordinates)
+          .addTo(map.current);
+      } else {
+        marker.current.setLngLat(coordinates);
       }
 
-      marker.current = new mapboxgl.Marker(el)
-        .setLngLat([locationData.longitude, locationData.latitude])
-        .addTo(map.current);
-
-      // Fly to the location with animation if in follow mode or initial load
-      if (followMode || initialLoadRef.current) {
-        map.current.flyTo({
-          center: [locationData.longitude, locationData.latitude],
-          zoom: 15,
-          speed: 1.5,
-          curve: 1,
-          essential: true
-        });
-        initialLoadRef.current = false;
-      }
-
-      // Add accuracy circle if not already added
+      // Add or update accuracy circle
       const accuracyCircleId = 'accuracy-circle';
       
       if (map.current.getSource(accuracyCircleId)) {
+        // Update existing source
         const source = map.current.getSource(accuracyCircleId);
         if (source) {
           source.setData({
             type: 'Feature',
             geometry: {
               type: 'Point',
-              coordinates: [locationData.longitude, locationData.latitude]
+              coordinates: coordinates
             },
             properties: {
-              accuracy: locationData.accuracy
+              accuracy: location.accuracy
             }
           });
         }
-      } else {
-        // Check if map is fully loaded before adding source
-        if (map.current.loaded()) {
-          try {
-            map.current.addSource(accuracyCircleId, {
-              type: 'geojson',
-              data: {
-                type: 'Feature',
-                geometry: {
-                  type: 'Point',
-                  coordinates: [locationData.longitude, locationData.latitude]
-                },
-                properties: {
-                  accuracy: locationData.accuracy
-                }
-              }
-            });
-
-            map.current.addLayer({
-              id: accuracyCircleId,
-              type: 'circle',
-              source: accuracyCircleId,
-              paint: {
-                'circle-radius': {
-                  stops: [
-                    [0, 0],
-                    [20, locationData.accuracy]
-                  ],
-                  base: 2
-                },
-                'circle-color': 'rgba(255, 0, 0, 0.15)',
-                'circle-opacity': 0.5,
-                'circle-stroke-width': 2,
-                'circle-stroke-color': 'rgba(255, 0, 0, 0.5)',
-                'circle-stroke-opacity': 0.7
-              }
-            });
-          } catch (e) {
-            console.warn('Could not add accuracy circle', e);
-          }
-        } else {
-          // If map is not fully loaded, wait for the load event
-          map.current.on('load', () => {
-            // Only add the source if it doesn't already exist
-            if (!map.current.getSource(accuracyCircleId)) {
-              try {
-                map.current.addSource(accuracyCircleId, {
-                  type: 'geojson',
-                  data: {
-                    type: 'Feature',
-                    geometry: {
-                      type: 'Point',
-                      coordinates: [locationData.longitude, locationData.latitude]
-                    },
-                    properties: {
-                      accuracy: locationData.accuracy
-                    }
-                  }
-                });
-
-                map.current.addLayer({
-                  id: accuracyCircleId,
-                  type: 'circle',
-                  source: accuracyCircleId,
-                  paint: {
-                    'circle-radius': {
-                      stops: [
-                        [0, 0],
-                        [20, locationData.accuracy]
-                      ],
-                      base: 2
-                    },
-                    'circle-color': 'rgba(255, 0, 0, 0.15)',
-                    'circle-opacity': 0.5,
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': 'rgba(255, 0, 0, 0.5)',
-                    'circle-stroke-opacity': 0.7
-                  }
-                });
-              } catch (e) {
-                console.warn('Could not add accuracy circle on load', e);
+      } else if (map.current.loaded()) {
+        // Add new source and layer if map is loaded
+        try {
+          map.current.addSource(accuracyCircleId, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: coordinates
+              },
+              properties: {
+                accuracy: location.accuracy
               }
             }
           });
+
+          map.current.addLayer({
+            id: accuracyCircleId,
+            type: 'circle',
+            source: accuracyCircleId,
+            paint: {
+              'circle-radius': {
+                stops: [
+                  [0, 0],
+                  [20, location.accuracy]
+                ],
+                base: 2
+              },
+              'circle-color': 'rgba(255, 0, 0, 0.15)',
+              'circle-opacity': 0.5,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': 'rgba(255, 0, 0, 0.5)',
+              'circle-stroke-opacity': 0.7
+            }
+          });
+        } catch (e) {
+          console.warn('Could not add accuracy circle', e);
         }
+      }
+
+      // Fly to the location with animation if in follow mode or initial load
+      if (followMode || initialLoadRef.current) {
+        map.current.flyTo({
+          center: coordinates,
+          zoom: 15,
+          speed: initialLoadRef.current ? 2 : 1.2,
+          curve: 1,
+          essential: true
+        });
+        initialLoadRef.current = false;
       }
     } catch (error) {
       console.error('Error updating marker:', error);
     }
-  }, [mapLoaded, locationData, mapboxgl, followMode]);
+  };
+
+  // Update marker when location data changes
+  useEffect(() => {
+    if (!mapLoaded || !locationData) return;
+    updateMarkerAndAccuracy(locationData);
+  }, [mapLoaded, locationData, followMode]);
 
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
