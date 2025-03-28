@@ -5,6 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Navigation } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { createLocationMarker } from '@/utils/mapUtils';
 
 // Set default token to your public token
 const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
@@ -26,39 +27,6 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapboxgl, setMapboxgl] = useState<any>(null);
   const initialLoadRef = useRef(true);
-  const [distance, setDistance] = useState<number | null>(null);
-  const [travelTime, setTravelTime] = useState<string | null>(null);
-
-  // Calculate distance between two points in meters
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = lat1 * Math.PI/180;
-    const φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180;
-    const Δλ = (lon2-lon1) * Math.PI/180;
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  // Calculate estimated travel time based on walking speed (4 km/h)
-  const calculateTravelTime = (distanceInMeters: number): string => {
-    const walkingSpeedMetersPerMinute = 4000 / 60;
-    const minutes = Math.round(distanceInMeters / walkingSpeedMetersPerMinute);
-    
-    if (minutes < 1) {
-      return "Less than a minute";
-    } else if (minutes < 60) {
-      return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-    } else {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return `${hours} hour${hours === 1 ? '' : 's'}${remainingMinutes > 0 ? ` ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}` : ''}`;
-    }
-  };
 
   // Dynamically import mapbox-gl
   useEffect(() => {
@@ -195,22 +163,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
 
     try {
       // Create a blinking marker element for tracked device (RED)
-      const el = document.createElement('div');
-      el.className = 'relative w-10 h-10'; // Increased size for better visibility
-      
-      const innerDiv = document.createElement('div');
-      innerDiv.className = 'absolute w-10 h-10 bg-red-600 rounded-full flex items-center justify-center animate-pulse shadow-[0_0_15px_rgba(255,0,0,0.7)]'; // Added glow effect
-      
-      const dot = document.createElement('div');
-      dot.className = 'w-4 h-4 bg-white rounded-full'; // Increased size of inner dot
-      
-      // Add a pulse animation effect
-      const pulseRing = document.createElement('div');
-      pulseRing.className = 'absolute w-10 h-10 rounded-full border-4 border-red-600 animate-ping opacity-75';
-      
-      el.appendChild(pulseRing);
-      innerDiv.appendChild(dot);
-      el.appendChild(innerDiv);
+      const el = createLocationMarker(true);
 
       if (marker.current) {
         marker.current.remove();
@@ -232,7 +185,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
         initialLoadRef.current = false;
       }
 
-      // Add accuracy circle if not already added (YELLOW for path/route)
+      // Add accuracy circle if not already added
       const accuracyCircleId = 'accuracy-circle';
       
       if (map.current.getSource(accuracyCircleId)) {
@@ -275,103 +228,17 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                 'circle-radius': {
                   stops: [
                     [0, 0],
-                    [20, locationData.accuracy / 2]
+                    [20, locationData.accuracy] // Increased accuracy level (no division by 2)
                   ],
                   base: 2
                 },
-                'circle-color': '#FFD700', // Yellow color for path/route
-                'circle-opacity': 0.25, // Increased opacity for better visibility
-                'circle-stroke-width': 2, // Thicker stroke
-                'circle-stroke-color': '#FFD700', // Yellow color for path/route
-                'circle-stroke-opacity': 0.5 // Increased opacity for better visibility
+                'circle-color': 'rgba(255, 0, 0, 0.15)',
+                'circle-opacity': 0.5,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': 'rgba(255, 0, 0, 0.5)',
+                'circle-stroke-opacity': 0.7
               }
             });
-
-            // Add a "current location" marker (BLUE)
-            // This is a simulated current device location for demonstration
-            const currentLocationOffset = 0.001; // Small offset for demonstration
-            
-            const currentLocationEl = document.createElement('div');
-            currentLocationEl.className = 'relative w-8 h-8'; // Increased size for better visibility
-            
-            const currentInnerDiv = document.createElement('div');
-            currentInnerDiv.className = 'absolute w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(0,0,255,0.7)]'; // Added glow effect
-            
-            const currentDot = document.createElement('div');
-            currentDot.className = 'w-3 h-3 bg-white rounded-full'; // Increased size
-            
-            currentInnerDiv.appendChild(currentDot);
-            currentLocationEl.appendChild(currentInnerDiv);
-
-            const currentLocation = [
-              locationData.longitude + currentLocationOffset,
-              locationData.latitude + currentLocationOffset
-            ];
-
-            new mapboxgl.Marker(currentLocationEl)
-              .setLngLat(currentLocation)
-              .addTo(map.current);
-              
-            // Calculate distance and travel time
-            const distanceInMeters = calculateDistance(
-              locationData.latitude, 
-              locationData.longitude,
-              locationData.latitude + currentLocationOffset,
-              locationData.longitude + currentLocationOffset
-            );
-            
-            setDistance(distanceInMeters);
-            setTravelTime(calculateTravelTime(distanceInMeters));
-            
-            // Add line between current and tracked location
-            if (map.current.getSource('route')) {
-              const source = map.current.getSource('route');
-              if (source) {
-                source.setData({
-                  type: 'Feature',
-                  properties: {},
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: [
-                      currentLocation,
-                      [locationData.longitude, locationData.latitude]
-                    ]
-                  }
-                });
-              }
-            } else {
-              map.current.addSource('route', {
-                type: 'geojson',
-                data: {
-                  type: 'Feature',
-                  properties: {},
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: [
-                      currentLocation,
-                      [locationData.longitude, locationData.latitude]
-                    ]
-                  }
-                }
-              });
-              
-              map.current.addLayer({
-                id: 'route',
-                type: 'line',
-                source: 'route',
-                layout: {
-                  'line-join': 'round',
-                  'line-cap': 'round'
-                },
-                paint: {
-                  'line-color': '#FFD700',
-                  'line-width': 4,
-                  'line-opacity': 0.8,
-                  'line-dasharray': [2, 1]
-                }
-              });
-            }
-              
           } catch (e) {
             console.warn('Could not add accuracy circle', e);
           }
@@ -403,82 +270,15 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                     'circle-radius': {
                       stops: [
                         [0, 0],
-                        [20, locationData.accuracy / 2]
+                        [20, locationData.accuracy] // Increased accuracy level (no division by 2)
                       ],
                       base: 2
                     },
-                    'circle-color': '#FFD700', // Yellow color for path/route
-                    'circle-opacity': 0.25, // Increased opacity
-                    'circle-stroke-width': 2, // Thicker stroke
-                    'circle-stroke-color': '#FFD700', // Yellow color for path/route
-                    'circle-stroke-opacity': 0.5 // Increased opacity
-                  }
-                });
-                
-                // Add a "current location" marker (BLUE)
-                const currentLocationOffset = 0.001; // Small offset for demonstration
-                
-                const currentLocationEl = document.createElement('div');
-                currentLocationEl.className = 'relative w-8 h-8'; // Increased size
-                
-                const currentInnerDiv = document.createElement('div');
-                currentInnerDiv.className = 'absolute w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(0,0,255,0.7)]'; // Added glow
-                
-                const currentDot = document.createElement('div');
-                currentDot.className = 'w-3 h-3 bg-white rounded-full';
-                
-                currentInnerDiv.appendChild(currentDot);
-                currentLocationEl.appendChild(currentInnerDiv);
-
-                const currentLocation = [
-                  locationData.longitude + currentLocationOffset,
-                  locationData.latitude + currentLocationOffset
-                ];
-
-                new mapboxgl.Marker(currentLocationEl)
-                  .setLngLat(currentLocation)
-                  .addTo(map.current);
-                  
-                // Calculate distance and travel time
-                const distanceInMeters = calculateDistance(
-                  locationData.latitude, 
-                  locationData.longitude,
-                  locationData.latitude + currentLocationOffset,
-                  locationData.longitude + currentLocationOffset
-                );
-                
-                setDistance(distanceInMeters);
-                setTravelTime(calculateTravelTime(distanceInMeters));
-                
-                // Add line between current and tracked location
-                map.current.addSource('route', {
-                  type: 'geojson',
-                  data: {
-                    type: 'Feature',
-                    properties: {},
-                    geometry: {
-                      type: 'LineString',
-                      coordinates: [
-                        currentLocation,
-                        [locationData.longitude, locationData.latitude]
-                      ]
-                    }
-                  }
-                });
-                
-                map.current.addLayer({
-                  id: 'route',
-                  type: 'line',
-                  source: 'route',
-                  layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round'
-                  },
-                  paint: {
-                    'line-color': '#FFD700',
-                    'line-width': 4,
-                    'line-opacity': 0.8,
-                    'line-dasharray': [2, 1]
+                    'circle-color': 'rgba(255, 0, 0, 0.15)',
+                    'circle-opacity': 0.5,
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': 'rgba(255, 0, 0, 0.5)',
+                    'circle-stroke-opacity': 0.7
                   }
                 });
               } catch (e) {
@@ -568,17 +368,6 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
         <>
           <div ref={mapContainer} className="absolute inset-0" />
           
-          {/* Distance and time indicator (visible only in follow mode with location data) */}
-          {followMode && locationData && distance && travelTime && (
-            <div className="absolute top-4 z-10 left-1/2 transform -translate-x-1/2 bg-black/70 px-4 py-2 rounded-full text-white font-medium text-base shadow-lg border border-white/20">
-              <div className="flex items-center gap-3">
-                <span>{Math.round(distance)} meters</span>
-                <span className="w-1 h-1 bg-white rounded-full"></span>
-                <span>{travelTime}</span>
-              </div>
-            </div>
-          )}
-          
           {!mapboxLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900 bg-opacity-80 backdrop-blur-sm">
               <div className="text-center">
@@ -642,14 +431,6 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
           </div>
           
           <div className="absolute top-4 left-4 z-10 bg-black/70 p-3 rounded-md shadow-md text-white text-sm border border-white/20">
-            <div className="flex items-center gap-1 mb-1">
-              <div className="w-3 h-3 rounded-full bg-blue-600 shadow-[0_0_5px_rgba(0,0,255,0.7)]"></div>
-              <span>Current Device</span>
-            </div>
-            <div className="flex items-center gap-1 mb-1">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_5px_rgba(255,215,0,0.7)]"></div>
-              <span>Path/Route</span>
-            </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_5px_rgba(255,0,0,0.7)]"></div>
               <span>Tracked Device</span>

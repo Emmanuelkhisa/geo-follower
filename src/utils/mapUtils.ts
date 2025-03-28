@@ -1,34 +1,5 @@
 
-// Calculate distance between two points in meters
-export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = lat1 * Math.PI/180;
-  const φ2 = lat2 * Math.PI/180;
-  const Δφ = (lat2-lat1) * Math.PI/180;
-  const Δλ = (lon2-lon1) * Math.PI/180;
-
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};
-
-// Calculate estimated travel time based on walking speed (4 km/h)
-export const calculateTravelTime = (distanceInMeters: number): string => {
-  const walkingSpeedMetersPerMinute = 4000 / 60;
-  const minutes = Math.round(distanceInMeters / walkingSpeedMetersPerMinute);
-  
-  if (minutes < 1) {
-    return "Less than a minute";
-  } else if (minutes < 60) {
-    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-  } else {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours} hour${hours === 1 ? '' : 's'}${remainingMinutes > 0 ? ` ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}` : ''}`;
-  }
-};
+// Map utility functions
 
 // Create a utility function to create map UI elements
 export const createMapLegend = () => {
@@ -37,7 +8,6 @@ export const createMapLegend = () => {
   
   const items = [
     { color: 'bg-blue-600', shadow: 'shadow-[0_0_5px_rgba(0,0,255,0.7)]', label: 'Current Device' },
-    { color: 'bg-yellow-500', shadow: 'shadow-[0_0_5px_rgba(255,215,0,0.7)]', label: 'Path/Route' },
     { color: 'bg-red-600', shadow: 'shadow-[0_0_5px_rgba(255,0,0,0.7)]', label: 'Tracked Device' }
   ];
   

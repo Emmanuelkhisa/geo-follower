@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calculateDistance, calculateTravelTime } from '@/utils/mapUtils';
 
 interface GoogleMapProps {
   locationData: LocationData | null;
@@ -23,8 +22,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const trackedMarker = useRef<google.maps.Marker | null>(null);
-  const currentMarker = useRef<google.maps.Marker | null>(null);
-  const routeLine = useRef<google.maps.Polyline | null>(null);
   const accuracyCircle = useRef<google.maps.Circle | null>(null);
   
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -33,8 +30,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
   const [showKeyInput, setShowKeyInput] = useState(!localStorage.getItem('google_api_key'));
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapType, setMapType] = useState('roadmap');
-  const [distance, setDistance] = useState<number | null>(null);
-  const [travelTime, setTravelTime] = useState<string | null>(null);
 
   // Dynamically load Google Maps API
   useEffect(() => {
@@ -144,8 +139,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
     return () => {
       // Clean up markers and other Google Maps objects
       if (trackedMarker.current) trackedMarker.current.setMap(null);
-      if (currentMarker.current) currentMarker.current.setMap(null);
-      if (routeLine.current) routeLine.current.setMap(null);
       if (accuracyCircle.current) accuracyCircle.current.setMap(null);
     };
   }, [googleMapsLoaded, locationData, mapType]);
@@ -186,10 +179,10 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
           map: map.current,
           center: trackedPosition,
           radius: locationData.accuracy,
-          strokeColor: '#FFD700',
+          strokeColor: '#FF0000',
           strokeOpacity: 0.8,
           strokeWeight: 2,
-          fillColor: '#FFD700',
+          fillColor: '#FF0000',
           fillOpacity: 0.25,
           zIndex: 1
         });
@@ -197,64 +190,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
         accuracyCircle.current.setCenter(trackedPosition);
         accuracyCircle.current.setRadius(locationData.accuracy);
       }
-      
-      // Add a "current location" marker (BLUE)
-      // This is a simulated current device location for demonstration
-      const currentLocationOffset = 0.001; // Small offset for demonstration
-      const currentPosition = {
-        lat: locationData.latitude + currentLocationOffset,
-        lng: locationData.longitude + currentLocationOffset
-      };
-      
-      if (!currentMarker.current) {
-        currentMarker.current = new google.maps.Marker({
-          position: currentPosition,
-          map: map.current,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: '#0000FF',
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 2
-          },
-          zIndex: 2,
-          title: 'Current Device'
-        });
-      } else {
-        currentMarker.current.setPosition(currentPosition);
-      }
-      
-      // Add line between current and tracked location
-      const routePath = [
-        currentPosition,
-        trackedPosition
-      ];
-      
-      if (!routeLine.current) {
-        routeLine.current = new google.maps.Polyline({
-          path: routePath,
-          geodesic: true,
-          strokeColor: '#FFD700',
-          strokeOpacity: 0.8,
-          strokeWeight: 4,
-          map: map.current,
-          zIndex: 1
-        });
-      } else {
-        routeLine.current.setPath(routePath);
-      }
-      
-      // Calculate distance and travel time
-      const distanceInMeters = calculateDistance(
-        currentPosition.lat, 
-        currentPosition.lng,
-        trackedPosition.lat,
-        trackedPosition.lng
-      );
-      
-      setDistance(distanceInMeters);
-      setTravelTime(calculateTravelTime(distanceInMeters));
       
       // Fly to the location with animation if in follow mode
       if (followMode) {
@@ -325,17 +260,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
       ) : (
         <>
           <div ref={mapContainer} className="absolute inset-0" />
-          
-          {/* Distance and time indicator */}
-          {followMode && locationData && distance && travelTime && (
-            <div className="absolute top-4 z-10 left-1/2 transform -translate-x-1/2 bg-black/70 px-4 py-2 rounded-full text-white font-medium text-base shadow-lg border border-white/20">
-              <div className="flex items-center gap-3">
-                <span>{Math.round(distance)} meters</span>
-                <span className="w-1 h-1 bg-white rounded-full"></span>
-                <span>{travelTime}</span>
-              </div>
-            </div>
-          )}
           
           {/* Map type selector */}
           <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-10">
@@ -415,14 +339,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
           </div>
           
           <div className="absolute top-4 left-4 z-10 bg-black/70 p-3 rounded-md shadow-md text-white text-sm border border-white/20">
-            <div className="flex items-center gap-1 mb-1">
-              <div className="w-3 h-3 rounded-full bg-blue-600 shadow-[0_0_5px_rgba(0,0,255,0.7)]"></div>
-              <span>Current Device</span>
-            </div>
-            <div className="flex items-center gap-1 mb-1">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_5px_rgba(255,215,0,0.7)]"></div>
-              <span>Path/Route</span>
-            </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_5px_rgba(255,0,0,0.7)]"></div>
               <span>Tracked Device</span>
