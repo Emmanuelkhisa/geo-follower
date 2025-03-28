@@ -5,10 +5,10 @@
 // 2. Run: npm install ws
 // 3. Start server with: node server.js
 
-const WebSocket = require('ws');
+import { WebSocket, WebSocketServer } from 'ws';
 
 const PORT = 8081;
-const wsServer = new WebSocket.Server({ port: PORT });
+const wsServer = new WebSocketServer({ port: PORT });
 
 console.log(`WebSocket server is running on port ${PORT}`);
 
