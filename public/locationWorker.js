@@ -25,6 +25,12 @@ self.addEventListener('message', (event) => {
     case 'STOP_TRACKING':
       stopTracking(data.trackerId);
       break;
+    case 'POSITION_RESPONSE':
+      if (data && data.coords) {
+        // Handle position data sent from client
+        sendLocationUpdate(data, data.trackerId);
+      }
+      break;
     default:
       console.log('Unknown message type:', type);
   }
@@ -105,37 +111,15 @@ function stopTracking(trackerId) {
 }
 
 function getCurrentPosition() {
-  // Since service workers don't have direct access to geolocation,
-  // we'll use a proxy mechanism to get the actual position
   return new Promise((resolve, reject) => {
-    // In a real world scenario, you'd use a real position from the device
-    // This would typically be provided by the client via a postMessage
-    try {
-      self.clients.matchAll().then(clients => {
-        if (clients.length > 0) {
-          // Request position from client
-          clients[0].postMessage({ type: 'REQUEST_POSITION' });
-        } else {
-          reject(new Error('No client available to request position'));
-        }
-      });
-      
-      // For now, create a dummy position with real structure but no simulation
-      const position = {
-        coords: {
-          latitude: 0, 
-          longitude: 0,
-          accuracy: 10
-        },
-        timestamp: Date.now()
-      };
-      
-      // In a real implementation, we would wait for a response from the client
-      // before resolving this promise with the actual position
-      resolve(position);
-    } catch (error) {
-      reject(error);
-    }
+    self.clients.matchAll().then(clients => {
+      if (clients.length > 0) {
+        // Request position from client
+        clients[0].postMessage({ type: 'REQUEST_POSITION' });
+      } else {
+        reject(new Error('No client available to request position'));
+      }
+    });
   });
 }
 
@@ -147,7 +131,7 @@ function sendLocationUpdate(position, trackerId) {
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
     accuracy: position.coords.accuracy,
-    timestamp: position.timestamp
+    timestamp: position.timestamp || Date.now()
   };
   
   console.log('Location update in worker:', locationData);

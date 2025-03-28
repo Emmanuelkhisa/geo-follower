@@ -5,7 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Navigation } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { createLocationMarker } from '@/utils/mapUtils';
+import { createLocationMarker, createMapLegend } from '@/utils/mapUtils';
 
 // Set default token to your public token
 const DEFAULT_MAPBOX_TOKEN = "pk.eyJ1IjoidHJlYWxlciIsImEiOiJjbThxN2VhMGkwZWtoMmpxeGFqNG1jMzV3In0.LrKqNjHZ8WpyYnav1EIWXQ";
@@ -111,6 +111,12 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                 'high-color': 'rgb(10, 10, 20)',
                 'horizon-blend': 0.2
               });
+              
+              // Add map legend
+              if (mapContainer.current) {
+                const legendElement = createMapLegend();
+                mapContainer.current.appendChild(legendElement);
+              }
             }
             setMapLoaded(true);
             setMapError(null);
@@ -228,7 +234,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                 'circle-radius': {
                   stops: [
                     [0, 0],
-                    [20, locationData.accuracy] // Increased accuracy level (no division by 2)
+                    [20, locationData.accuracy]
                   ],
                   base: 2
                 },
@@ -270,7 +276,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                     'circle-radius': {
                       stops: [
                         [0, 0],
-                        [20, locationData.accuracy] // Increased accuracy level (no division by 2)
+                        [20, locationData.accuracy]
                       ],
                       base: 2
                     },
@@ -408,7 +414,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
             </div>
           )}
           
-          <div className="absolute bottom-4 right-4 z-10 flex gap-2">
+          <div className="absolute bottom-4 right-4 z-10">
             {onToggleFollowMode && locationData && (
               <Button 
                 onClick={onToggleFollowMode} 
@@ -420,21 +426,6 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                 {followMode ? "Following" : "Follow Device"}
               </Button>
             )}
-            <Button 
-              onClick={() => setShowTokenInput(true)} 
-              variant="outline" 
-              size="sm"
-              className="bg-black/70 hover:bg-black/80 shadow-md text-base px-4 py-2 text-white border-white/20"
-            >
-              Change Map Token
-            </Button>
-          </div>
-          
-          <div className="absolute top-4 left-4 z-10 bg-black/70 p-3 rounded-md shadow-md text-white text-sm border border-white/20">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_5px_rgba(255,0,0,0.7)]"></div>
-              <span>Tracked Device</span>
-            </div>
           </div>
         </>
       )}

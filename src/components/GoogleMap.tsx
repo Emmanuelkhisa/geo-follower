@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { createMapLegend } from '@/utils/mapUtils';
 
 interface GoogleMapProps {
   locationData: LocationData | null;
@@ -26,50 +27,41 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
-  const [googleApiKey, setGoogleApiKey] = useState<string>(localStorage.getItem('google_api_key') || '');
-  const [showKeyInput, setShowKeyInput] = useState(!localStorage.getItem('google_api_key'));
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapType, setMapType] = useState('roadmap');
 
   // Dynamically load Google Maps API
   useEffect(() => {
-    if (!googleApiKey) return;
+    if (window.google && window.google.maps) {
+      setGoogleMapsLoaded(true);
+      return;
+    }
+
+    // Create script element to load Google Maps API - without API key
+    const googleMapsScript = document.createElement('script');
+    googleMapsScript.src = `https://maps.googleapis.com/maps/api/js?libraries=places`;
+    googleMapsScript.async = true;
+    googleMapsScript.defer = true;
+    googleMapsScript.id = 'google-maps-script';
     
-    const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
-        setGoogleMapsLoaded(true);
-        return;
+    googleMapsScript.addEventListener('load', () => {
+      setGoogleMapsLoaded(true);
+    });
+    
+    googleMapsScript.addEventListener('error', () => {
+      setMapError('Failed to load Google Maps. Please try again later.');
+    });
+    
+    document.head.appendChild(googleMapsScript);
+    
+    return () => {
+      // Cleanup script on unmount
+      const script = document.getElementById('google-maps-script');
+      if (script) {
+        document.head.removeChild(script);
       }
-
-      // Create script element to load Google Maps API
-      const googleMapsScript = document.createElement('script');
-      googleMapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}&libraries=places`;
-      googleMapsScript.async = true;
-      googleMapsScript.defer = true;
-      googleMapsScript.id = 'google-maps-script';
-      
-      googleMapsScript.addEventListener('load', () => {
-        setGoogleMapsLoaded(true);
-      });
-      
-      googleMapsScript.addEventListener('error', () => {
-        setMapError('Failed to load Google Maps. Please check your API key.');
-        setShowKeyInput(true);
-      });
-      
-      document.head.appendChild(googleMapsScript);
-      
-      return () => {
-        // Cleanup script on unmount
-        const script = document.getElementById('google-maps-script');
-        if (script) {
-          document.head.removeChild(script);
-        }
-      };
     };
-
-    loadGoogleMaps();
-  }, [googleApiKey]);
+  }, []);
 
   // Initialize map after Google Maps API is loaded
   useEffect(() => {
@@ -128,6 +120,13 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
       };
 
       map.current = new google.maps.Map(mapContainer.current, mapOptions);
+      
+      // Add map legend
+      if (mapContainer.current) {
+        const legendElement = createMapLegend();
+        mapContainer.current.appendChild(legendElement);
+      }
+      
       setMapLoaded(true);
       setMapError(null);
       
@@ -200,21 +199,6 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
     }
   }, [mapLoaded, locationData, followMode]);
 
-  const handleKeySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const input = form.elements.namedItem('googleApiKey') as HTMLInputElement;
-    
-    if (input.value.trim()) {
-      setGoogleApiKey(input.value.trim());
-      setShowKeyInput(false);
-      setMapError(null);
-      
-      // Store token in localStorage for future use
-      localStorage.setItem('google_api_key', input.value.trim());
-    }
-  };
-
   const handleMapTypeChange = (value: string) => {
     setMapType(value);
     if (map.current) {
@@ -224,128 +208,67 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
 
   return (
     <div className="relative w-full h-full min-h-[400px] rounded-2xl overflow-hidden shadow-lg">
-      {showKeyInput ? (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/90 p-4">
-          <Card className="max-w-md w-full shadow-xl border-geo-blue/20 bg-slate-800 text-white">
+      <div ref={mapContainer} className="absolute inset-0" />
+      
+      {/* Map type selector */}
+      <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-10">
+        <Select value={mapType} onValueChange={handleMapTypeChange}>
+          <SelectTrigger className="w-40 bg-black/70 border border-white/20 text-white">
+            <SelectValue placeholder="Map Type" />
+          </SelectTrigger>
+          <SelectContent className="bg-black/90 border border-white/20 text-white">
+            <SelectItem value="roadmap">Road Map</SelectItem>
+            <SelectItem value="terrain">Terrain</SelectItem>
+            <SelectItem value="satellite">Satellite</SelectItem>
+            <SelectItem value="hybrid">Hybrid</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {!googleMapsLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 bg-opacity-80 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-geo-blue mx-auto"></div>
+            <p className="mt-4 text-lg text-white">Loading Google Maps...</p>
+          </div>
+        </div>
+      )}
+      
+      {mapError && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+          <Card className="max-w-md w-full shadow-xl border-red-700 bg-slate-800 text-white">
             <CardHeader className="border-b border-slate-700 pb-3">
-              <CardTitle className="text-xl text-geo-blue">Google Maps API Key Required</CardTitle>
+              <CardTitle className="text-xl text-red-500 flex items-center">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                Map Error
+              </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              {mapError && (
-                <div className="p-3 mb-4 bg-red-900/50 border border-red-700 text-red-200 rounded-md text-sm">
-                  {mapError}
-                </div>
-              )}
-              <p className="text-base text-slate-300 mb-6">
-                Please enter your Google Maps API key. You can get one from the{' '}
-                <a href="https://console.cloud.google.com/google/maps-apis" target="_blank" rel="noopener noreferrer" className="text-geo-blue font-medium hover:underline">
-                  Google Cloud Console
-                </a>
-              </p>
-              <form onSubmit={handleKeySubmit} className="space-y-4">
-                <input
-                  type="text"
-                  name="googleApiKey"
-                  placeholder="AIzaSyD..."
-                  defaultValue={googleApiKey || ''}
-                  className="w-full px-4 py-3 border border-slate-600 bg-slate-700 rounded-md text-base text-white"
-                />
-                <Button type="submit" className="w-full py-5 text-base bg-geo-blue hover:bg-geo-blue/90">
-                  Set API Key
-                </Button>
-              </form>
+              <p className="mb-6 text-base text-slate-300">{mapError}</p>
+              <Button 
+                onClick={() => window.location.reload()}
+                className="w-full py-5 text-base bg-geo-blue hover:bg-geo-blue/90"
+              >
+                Reload Page
+              </Button>
             </CardContent>
           </Card>
         </div>
-      ) : (
-        <>
-          <div ref={mapContainer} className="absolute inset-0" />
-          
-          {/* Map type selector */}
-          <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-10">
-            <Select value={mapType} onValueChange={handleMapTypeChange}>
-              <SelectTrigger className="w-40 bg-black/70 border border-white/20 text-white">
-                <SelectValue placeholder="Map Type" />
-              </SelectTrigger>
-              <SelectContent className="bg-black/90 border border-white/20 text-white">
-                <SelectItem value="roadmap">Road Map</SelectItem>
-                <SelectItem value="terrain">Terrain</SelectItem>
-                <SelectItem value="satellite">Satellite</SelectItem>
-                <SelectItem value="hybrid">Hybrid</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {!googleMapsLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 bg-opacity-80 backdrop-blur-sm">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-geo-blue mx-auto"></div>
-                <p className="mt-4 text-lg text-white">Loading Google Maps...</p>
-              </div>
-            </div>
-          )}
-          
-          {mapError && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
-              <Card className="max-w-md w-full shadow-xl border-red-700 bg-slate-800 text-white">
-                <CardHeader className="border-b border-slate-700 pb-3">
-                  <CardTitle className="text-xl text-red-500 flex items-center">
-                    <AlertTriangle className="h-5 w-5 mr-2" />
-                    Map Error
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <p className="mb-6 text-base text-slate-300">{mapError}</p>
-                  <div className="flex space-x-3">
-                    <Button 
-                      onClick={() => setShowKeyInput(true)} 
-                      className="flex-1 py-5 text-base bg-geo-blue hover:bg-geo-blue/90"
-                    >
-                      Change API Key
-                    </Button>
-                    <Button 
-                      onClick={() => window.location.reload()}
-                      variant="outline"
-                      className="flex-1 py-5 text-base border-slate-600 text-slate-200"
-                    >
-                      Reload Page
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-          
-          <div className="absolute bottom-4 right-4 z-10 flex gap-2">
-            {onToggleFollowMode && locationData && (
-              <Button 
-                onClick={onToggleFollowMode} 
-                variant={followMode ? "default" : "outline"}
-                size="sm"
-                className={followMode ? "bg-geo-blue hover:bg-geo-blue/90 text-base px-4 py-2" : "bg-black/70 hover:bg-black/80 shadow-md text-base px-4 py-2 text-white border-white/20"}
-              >
-                <Navigation className={followMode ? "animate-pulse mr-2" : "mr-2"} size={18} />
-                {followMode ? "Following" : "Follow Device"}
-              </Button>
-            )}
-            <Button 
-              onClick={() => setShowKeyInput(true)} 
-              variant="outline" 
-              size="sm"
-              className="bg-black/70 hover:bg-black/80 shadow-md text-base px-4 py-2 text-white border-white/20"
-            >
-              Change API Key
-            </Button>
-          </div>
-          
-          <div className="absolute top-4 left-4 z-10 bg-black/70 p-3 rounded-md shadow-md text-white text-sm border border-white/20">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_5px_rgba(255,0,0,0.7)]"></div>
-              <span>Tracked Device</span>
-            </div>
-          </div>
-        </>
       )}
+      
+      <div className="absolute bottom-4 right-4 z-10">
+        {onToggleFollowMode && locationData && (
+          <Button 
+            onClick={onToggleFollowMode} 
+            variant={followMode ? "default" : "outline"}
+            size="sm"
+            className={followMode ? "bg-geo-blue hover:bg-geo-blue/90 text-base px-4 py-2" : "bg-black/70 hover:bg-black/80 shadow-md text-base px-4 py-2 text-white border-white/20"}
+          >
+            <Navigation className={followMode ? "animate-pulse mr-2" : "mr-2"} size={18} />
+            {followMode ? "Following" : "Follow Device"}
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
