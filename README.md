@@ -1,11 +1,9 @@
 
-# GEO-MAN 
-
 ## GEOLOCATION FOLLOWER
 
-**URL**: https://preview--geo-follower.lovable.app/
+An open-sorce real-time location tracking application that allows you to create tracking links, monitor device locations, and view them on a map.
 
-A real-time location tracking application that allows you to create tracking links, monitor device locations, and view them on a map.
+Use Wisely
 
 ## Development Setup
 
