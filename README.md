@@ -1,6 +1,7 @@
 LINK: https://geofollower.netlify.app/
 
-![screenshot](public/Geoman.PNG)
+![screenshot](public/Geoman.PNG) ![My Image](public/geo-man.PNG)
+
 
 ## GEOLOCATION FOLLOWER
 
