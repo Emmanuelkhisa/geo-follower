@@ -82,5 +82,29 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.20"
+  },
+  "overrides": {
+    "lodash": "^4.17.21",
+    "minimatch": "^9.0.5",
+    "flatted": "^3.3.3",
+    "glob": "^10.4.5",
+    "picomatch": "^4.0.2",
+    "js-yaml": "^4.1.0",
+    "@babel/runtime": "^7.26.10",
+    "protocol-buffers-schema": "^3.6.0",
+    "rollup": "^4.44.2",
+    "esbuild": "^0.25.0"
+  },
+  "resolutions": {
+    "lodash": "^4.17.21",
+    "minimatch": "^9.0.5",
+    "flatted": "^3.3.3",
+    "glob": "^10.4.5",
+    "picomatch": "^4.0.2",
+    "js-yaml": "^4.1.0",
+    "@babel/runtime": "^7.26.10",
+    "protocol-buffers-schema": "^3.6.0",
+    "rollup": "^4.44.2",
+    "esbuild": "^0.25.0"
   }
 }
