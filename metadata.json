@@ -1,0 +1,10 @@
+{
+  "name": "Geo Follower",
+  "description": "Real-time location tracking and map viewing application",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
