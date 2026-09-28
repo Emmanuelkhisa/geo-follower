@@ -523,7 +523,7 @@ const GoogleMap = ({ locationData, followMode = false, onToggleFollowMode }: Goo
                 <input
                   type="text"
                   name="googleKey"
-                  placeholder="Enter Google Maps API Key (AIzaSy...)"
+                  placeholder="Enter Google Maps API Key"
                   defaultValue={apiKey}
                   className="w-full px-4 py-2.5 border border-slate-600 bg-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-geo-blue"
                 />

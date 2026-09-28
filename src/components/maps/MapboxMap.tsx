@@ -19,9 +19,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// Default to empty; use a token from env/localStorage when available.
-const DEFAULT_MAPBOX_TOKEN = "";
-
 interface MapboxMapProps {
   locationData: LocationData | null;
   followMode?: boolean;
@@ -50,7 +47,7 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
   );
 
   const [mapboxToken, setMapboxToken] = useState<string>(
-    localStorage.getItem('mapbox_token') || envMapboxToken || DEFAULT_MAPBOX_TOKEN
+    localStorage.getItem('mapbox_token') || envMapboxToken || ''
   );
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -541,8 +538,8 @@ const MapboxMap = ({ locationData, followMode = false, onToggleFollowMode }: Map
                 <input
                   type="text"
                   name="mapboxToken"
-                  placeholder="Enter Mapbox Token (pk.eyJ1...)"
-                  defaultValue={mapboxToken !== DEFAULT_MAPBOX_TOKEN ? mapboxToken : ''}
+                  placeholder="Enter Mapbox Access Token"
+                  defaultValue={mapboxToken || ''}
                   className="w-full px-4 py-2.5 border border-slate-600 bg-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-sky-400"
                 />
                 <Button type="submit" variant="secondary" className="w-full py-2.5 rounded-xl cursor-pointer">
